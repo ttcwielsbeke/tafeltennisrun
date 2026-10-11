@@ -22,10 +22,10 @@
   let overAt = 0;
 
   const CRASH = {
-    nopper: 'Recht in de noppen gelopen!',
-    table: 'Tegen de tafel geknald!',
+    nopper: 'Door de noppen gegaan!',
+    table: 'Tegen de clubtafel geknald!',
     net: 'In het net blijven hangen!',
-    machine: 'Tegen de ballenmachine!'
+    machine: 'Kopbal tegen de ballenmachine!'
   };
 
   /* ---------- geluid: standaard uit ---------- */
@@ -131,7 +131,7 @@
 
   async function loadBoard(seed, mine) {
     const list = $('board-list');
-    $('board-title').textContent = 'Ranglijst van vandaag (' + seed + ')';
+    $('board-title').textContent = 'Ranglijst TTC Wielsbeke-Spotit · ' + seed;
     $('board-note').textContent = 'Laden…';
     const { rows, source } = await board.top(seed);
     list.textContent = '';
@@ -146,7 +146,7 @@
     }
     if (!rows.length) {
       const li = document.createElement('li'); li.className = 'empty';
-      li.textContent = 'Nog niemand vandaag. Jij eerst!';
+      li.textContent = 'Nog niemand van de club vandaag. Jij eerst!';
       list.append(li);
     }
     $('board-note').textContent = source === 'supabase' ? 'Clubranking: top ' + rows.length

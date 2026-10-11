@@ -66,13 +66,32 @@ Succes = een nieuwe speler begrijpt het in 10 seconden, een run duurt 30–90 se
 
 ## 4. Thema en elementen
 
-- Hal: parketvloer, de zijlijnen, de tafels in de verte, een scorebord, een ventilator, de trainersbank.
-- Speler: een simpele figuur met een bat in de hand, kleur uit het bestaande PIPS OUT!-palet voor herkenning.
+- Hal: houten vloer, de zijlijnen, de tafels in de verte, een scorebord, een ventilator, de trainersbank.
+- Speler: een simpele figuur met een bat in de hand, in het clubshirt (zie Clubthema).
 - Noppenspelers: staan achter tafels, met rode en zwarte noppen (duidelijk herkenbaar), één per baan of als groep.
-- Tafels: groene tafel met witte lijn, plat genoeg om over te springen.
+- Tafels: blauwe tafel met witte lijn, plat genoeg om over te springen.
 - Ballen: witte tafeltennisballen, gouden bij de magneet.
 - Schild-bat: blauwe glow om de speler.
 - Woordspeling in de tekst: "Tafeltennisrun", "Eindeloos Smashen", "Ga niet door de noppen!"
+
+### Clubthema (wijziging van Jo, 2026-10-11)
+
+Alles staat in het teken van **TTC Wielsbeke-Spotit**, in dezelfde stijl als het smash-spel.
+
+- **Speler** draagt altijd (lopen, springen, sliden, schild) het clubshirt uit smash (`CLUB`):
+  shirt `#161616`, zoom `#0a0a0a`, short `#111111`, witte sokken en schoenen `#f4f4f4`, huid `#f0c39a`,
+  wit boordje `#f4f4f4`, een klein wit logootje, drie strepen `#e4474c` / `#c6a743` / `#2eb1c2`. Bat in clubrood `#c8242a`.
+- **Noppenspelers** dragen het PIPS OUT!-tenue (`PIPS` in smash): rood `#c8242a`, boord `#8d1519`,
+  een noppenrubber-look met `#f0716a` / `#d94a44` / `#8b1a1f`. De aartsrivaal: herkenbaar houden.
+- **Palet**: blauw `#0b3a75` / `#062a56` / `#1a5ca8`, goud `#ffd23f`, chrome `#9ed4ff`, inkt `#02132b`.
+  Tafels blauw `#1f4fa3` met witte lijn. Lettertype 'Press Start 2P' met dezelfde CSS-variabelen als smash
+  (`--px`, `--blue`, `--gold`, `--red`).
+- **Hal**: sporthal met een oranje houten vloer zoals de smash-zone SPORTHAL (`#c7652c` / `#a4501d`, lijnen `#f5e9c8`);
+  muur en scorebord in clubkleuren.
+- **Tekst**: titel "TAFELTENNISRUN — TTC Wielsbeke-Spotit"; de club staat ook op het titelscherm en in de voettekst.
+  Clubgrappen zoals "Ga niet door de noppen!" en "Clubshirt op, benen los".
+- `theme-color` is `#0b3a75`.
+- **Ranglijst**: de tabel blijft `runner_scores`; de clubnaam staat in de kop van de ranglijst.
 
 ## 5. Bouwen (aanpak)
 

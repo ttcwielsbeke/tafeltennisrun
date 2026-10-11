@@ -26,11 +26,26 @@
   const BAND = 1.2;            // parketvak in de lengte
   const PLANK = 0.5;           // parketplank in de breedte
 
+  /* bochten */
+  const OFF_N = 84;            // zijwaartse verschuiving tot zoveel meter voor de speler (stap 1 m)
+  const OFF_CLAMP = 0.6;       // verschuiving op het scherm maximaal ±0.6 × breedte
+  const BG_PAN = 0.6;          // panorama: W × BG_PAN pixels per radiaal draaiing
+  const STRIP_STEPS = 18;      // segmenten per gebogen lijn op de vloer
+
+  /* clubkleuren (TTC Wielsbeke-Spotit / PIPS OUT!) */
   const C = {
-    blueD: '#0b3a75', blue: '#2f7fd4', red: '#c8242a', gold: '#ffd23f',
-    green: '#1f7a4c', greenD: '#15583a', skin: '#e8b48a', hair: '#4a2e1c',
-    wood: '#c98d4f', woodD: '#a9703a'
+    ink: '#02132b', blueD: '#0b3a75', blueDD: '#062a56', blueM: '#1a5ca8', blue: '#2f7fd4',
+    red: '#c8242a', gold: '#ffd23f', chrome: '#9ed4ff',
+    table: '#1f4fa3', tableD: '#163a7a', legs: '#2a2f36',
+    skin: '#f0c39a', hair: '#3a2618', white: '#f4f4f4',
+    floor: '#c7652c', floorD: '#a4501d', line: '#f5e9c8'
   };
+  /* tenues, zoals in ULTRA SMASH! */
+  const CLUB = { shirt: '#161616', trim: '#f4f4f4', hem: '#0a0a0a', shorts: '#111111',
+                 stripes: ['#e4474c', '#c6a743', '#2eb1c2'] };
+  const PIPS = { shirt: '#c8242a', trim: '#8d1519', hem: '#8d1519', shorts: '#1c2430',
+                 pips: ['#f0716a', '#d94a44', '#8b1a1f'], bat: '#c8242a' };
+  const HUD_FONT = '"Press Start 2P", monospace';
 
   function hash(n) {
     const s = Math.sin(n * 12.9898 + 78.233) * 43758.5453;
@@ -57,8 +72,8 @@
       hy = feetY - camH * f / CAM_BACK;
       cx = W / 2;
       fogGrad = ctx.createLinearGradient(0, hy, 0, hy + (H - hy) * 0.22);
-      fogGrad.addColorStop(0, 'rgba(196,206,218,0.85)');
-      fogGrad.addColorStop(1, 'rgba(196,206,218,0)');
+      fogGrad.addColorStop(0, 'rgba(26,60,110,0.6)');
+      fogGrad.addColorStop(1, 'rgba(26,60,110,0)');
     }
 
     function resize() {
@@ -88,80 +103,102 @@
     function paintHall(g) {
       // plafond
       const ceil = hy * 0.22;
-      g.fillStyle = '#39414f';
+      g.fillStyle = C.ink;
       g.fillRect(0, 0, W, ceil);
-      g.fillStyle = 'rgba(255,250,225,0.9)';
+      g.fillStyle = 'rgba(158,212,255,0.85)';
       const nl = Math.max(3, Math.round(W / 140));
       for (let i = 0; i < nl; i++) {
         const lx = (i + 0.5) * W / nl;
         g.fillRect(lx - W * 0.035, ceil * 0.45, W * 0.07, Math.max(3, ceil * 0.18));
       }
-      // muur
+      // muur in clubblauw
       const wall = g.createLinearGradient(0, ceil, 0, hy);
-      wall.addColorStop(0, '#d9dfe7');
-      wall.addColorStop(1, '#b6c1ce');
+      wall.addColorStop(0, C.blueDD);
+      wall.addColorStop(1, C.blueD);
       g.fillStyle = wall;
       g.fillRect(0, ceil, W, hy - ceil);
       // muurpanelen
-      g.strokeStyle = 'rgba(80,95,115,0.18)';
+      g.strokeStyle = 'rgba(158,212,255,0.12)';
       g.lineWidth = 1;
       g.beginPath();
       const np = Math.max(4, Math.round(W / 90));
       for (let i = 1; i < np; i++) { const x = Math.round(i * W / np) + 0.5; g.moveTo(x, ceil); g.lineTo(x, hy); }
       g.stroke();
-      // blauwe plint van de hal
-      g.fillStyle = C.blueD;
-      g.fillRect(0, hy - hy * 0.09, W, hy * 0.09);
+      // plint met gouden bies
+      const plTop = hy - hy * 0.09;
+      g.fillStyle = C.blueM;
+      g.fillRect(0, plTop, W, hy * 0.09);
+      g.fillStyle = C.gold;
+      g.fillRect(0, plTop, W, Math.max(1, hy * 0.012));
 
       // scorebord
       const sw = clamp(W * 0.3, 90, 260), sh = sw * 0.42;
       const sx = W * 0.5 - sw / 2, sy = ceil + (hy * 0.91 - ceil) * 0.42 - sh / 2;
-      g.fillStyle = '#222';
+      g.fillStyle = C.chrome;
       g.fillRect(sx - 3, sy - 3, sw + 6, sh + 6);
-      g.fillStyle = '#0d0f12';
+      g.fillStyle = C.ink;
       g.fillRect(sx, sy, sw, sh);
       g.textAlign = 'center';
       g.textBaseline = 'middle';
       g.font = 'bold ' + Math.round(sh * 0.2) + 'px system-ui, sans-serif';
-      g.fillStyle = '#9fb4c8';
+      g.fillStyle = C.chrome;
       g.fillText('THUIS', sx + sw * 0.25, sy + sh * 0.2);
       g.fillText('GAST', sx + sw * 0.75, sy + sh * 0.2);
       g.font = 'bold ' + Math.round(sh * 0.48) + 'px ui-monospace, monospace';
-      g.fillStyle = '#ff4a3d';
-      g.fillText('11', sx + sw * 0.25, sy + sh * 0.62);
       g.fillStyle = C.gold;
-      g.fillText('9', sx + sw * 0.75, sy + sh * 0.62);
+      g.fillText('11', sx + sw * 0.25, sy + sh * 0.62);
       g.fillStyle = '#ff4a3d';
+      g.fillText('9', sx + sw * 0.75, sy + sh * 0.62);
+      g.fillStyle = C.gold;
       g.fillText(':', sx + sw * 0.5, sy + sh * 0.6);
+
+      // clubbanner onder het scorebord
+      const bTop = sy + sh + 3, bAvail = plTop - bTop;
+      const banW = W * 0.5;
+      const banFs = Math.min(banW / (20 * 0.66), bAvail * 0.45);
+      if (banFs >= 7) {
+        const banH = banFs * 1.7, banY = bTop + (bAvail - banH) / 2;
+        g.fillStyle = C.ink;
+        g.fillRect(W * 0.25, banY, banW, banH);
+        g.fillStyle = C.gold;
+        g.fillRect(W * 0.25, banY, banW, Math.max(1, banH * 0.08));
+        g.fillRect(W * 0.25, banY + banH * 0.92, banW, Math.max(1, banH * 0.08));
+        g.font = 'bold ' + Math.floor(banFs) + 'px system-ui, sans-serif';
+        g.fillStyle = C.white;
+        g.fillText('TTC WIELSBEKE-SPOTIT', W * 0.5, banY + banH * 0.53, banW * 0.94);
+      }
 
       // ventilator rechts aan de muur
       const fr = clamp(hy * 0.13, 10, 46);
       const fx = W * 0.88, fy = ceil + fr * 1.6;
-      g.fillStyle = '#5b6573';
+      g.fillStyle = '#26364f';
       g.beginPath(); g.arc(fx, fy, fr, 0, Math.PI * 2); g.fill();
-      g.fillStyle = '#c3cbd6';
+      g.fillStyle = C.chrome;
       for (let b = 0; b < 3; b++) {
         const a = b * Math.PI * 2 / 3 + 0.3;
         g.beginPath();
         g.ellipse(fx + Math.cos(a) * fr * 0.45, fy + Math.sin(a) * fr * 0.45, fr * 0.45, fr * 0.2, a, 0, Math.PI * 2);
         g.fill();
       }
-      g.strokeStyle = '#2b313a'; g.lineWidth = Math.max(1, fr * 0.08);
+      g.strokeStyle = C.ink; g.lineWidth = Math.max(1, fr * 0.08);
       g.beginPath(); g.arc(fx, fy, fr, 0, Math.PI * 2); g.stroke();
-      g.fillStyle = '#2b313a';
+      g.fillStyle = C.ink;
       g.beginPath(); g.arc(fx, fy, fr * 0.15, 0, Math.PI * 2); g.fill();
 
-      // clubvlag links
+      // clubvlag links: zwart met de drie strepen
       const bw = clamp(W * 0.12, 30, 120), bh = bw * 0.5;
       const bx = W * 0.1, by = ceil + (hy - ceil) * 0.5;
-      g.fillStyle = C.blue; g.fillRect(bx, by, bw, bh);
-      g.fillStyle = C.red; g.fillRect(bx, by + bh * 0.4, bw, bh * 0.2);
-      g.fillStyle = C.gold; g.fillRect(bx, by + bh * 0.85, bw, bh * 0.15);
+      g.fillStyle = CLUB.shirt; g.fillRect(bx, by, bw, bh);
+      for (let i = 0; i < 3; i++) {
+        g.fillStyle = CLUB.stripes[i];
+        g.fillRect(bx, by + bh * (0.3 + i * 0.16), bw, bh * 0.11);
+      }
+      g.fillStyle = C.white; g.fillRect(bx, by, bw, Math.max(1, bh * 0.06));
 
-      // vloer (basis parket)
+      // vloer: oranje clubhout
       const fl = g.createLinearGradient(0, hy, 0, H);
-      fl.addColorStop(0, '#b98451');
-      fl.addColorStop(1, C.wood);
+      fl.addColorStop(0, C.floorD);
+      fl.addColorStop(1, C.floor);
       g.fillStyle = fl;
       g.fillRect(0, hy, W, H - hy);
 
@@ -171,24 +208,26 @@
       const spots = [0.04, 0.16, 0.8, 0.92];
       for (let i = 0; i < spots.length; i++) {
         const tx = W * spots[i], tw = fs * 7;
-        g.fillStyle = '#333'; g.fillRect(tx + tw * 0.1, ty, fs * 0.4, fs * 1.4); g.fillRect(tx + tw * 0.85, ty, fs * 0.4, fs * 1.4);
-        g.fillStyle = C.green; g.fillRect(tx, ty - fs * 0.5, tw, fs * 0.7);
-        g.fillStyle = '#fff'; g.fillRect(tx + tw / 2 - 0.5, ty - fs * 1.1, 1, fs * 0.7);
+        g.fillStyle = C.legs; g.fillRect(tx + tw * 0.1, ty, fs * 0.4, fs * 1.4); g.fillRect(tx + tw * 0.85, ty, fs * 0.4, fs * 1.4);
+        g.fillStyle = C.table; g.fillRect(tx, ty - fs * 0.5, tw, fs * 0.7);
+        g.fillStyle = '#fff'; g.fillRect(tx, ty - fs * 0.5, tw, Math.max(1, fs * 0.15));
+        g.fillRect(tx + tw / 2 - 0.5, ty - fs * 1.1, 1, fs * 0.7);
       }
       // omheining in de verte
-      g.fillStyle = C.red;
       for (let i = 0; i < 6; i++) {
         const x = W * (0.25 + i * 0.1);
-        g.fillStyle = i % 2 ? C.red : C.blueD;
+        g.fillStyle = i % 2 ? C.red : C.blueM;
         g.fillRect(x, hy - fs * 0.2, W * 0.09, fs * 1.0);
       }
-      // trainersbank links
+      // trainersbank links, de trainer in clubtenue
       const bnx = W * 0.02, bny = hy + fs * 4;
-      g.fillStyle = '#6b4a2b'; g.fillRect(bnx, bny, fs * 10, fs * 0.8);
-      g.fillStyle = '#3a2a1a'; g.fillRect(bnx + fs, bny + fs * 0.8, fs * 0.5, fs * 1.3); g.fillRect(bnx + fs * 8.5, bny + fs * 0.8, fs * 0.5, fs * 1.3);
-      g.fillStyle = C.blueD; g.fillRect(bnx + fs * 2, bny - fs * 2.2, fs * 1.6, fs * 2.2);
+      g.fillStyle = '#5a3418'; g.fillRect(bnx, bny, fs * 10, fs * 0.8);
+      g.fillStyle = C.legs; g.fillRect(bnx + fs, bny + fs * 0.8, fs * 0.5, fs * 1.3); g.fillRect(bnx + fs * 8.5, bny + fs * 0.8, fs * 0.5, fs * 1.3);
+      g.fillStyle = CLUB.shirt; g.fillRect(bnx + fs * 2, bny - fs * 2.2, fs * 1.6, fs * 2.2);
+      g.fillStyle = CLUB.stripes[0]; g.fillRect(bnx + fs * 2, bny - fs * 1.5, fs * 1.6, Math.max(1, fs * 0.25));
       g.fillStyle = C.skin; g.beginPath(); g.arc(bnx + fs * 2.8, bny - fs * 2.8, fs * 0.7, 0, Math.PI * 2); g.fill();
-      g.fillStyle = C.red; g.fillRect(bnx + fs * 5.5, bny - fs * 1.2, fs * 2.4, fs * 1.2); // sporttas
+      g.fillStyle = C.blueD; g.fillRect(bnx + fs * 5.5, bny - fs * 1.2, fs * 2.4, fs * 1.2); // sporttas
+      g.fillStyle = C.gold; g.fillRect(bnx + fs * 5.5, bny - fs * 0.8, fs * 2.4, Math.max(1, fs * 0.2));
     }
 
     function drawBackground() {
@@ -202,14 +241,79 @@
           paintHall(g);
         }
       }
-      if (bg) ctx.drawImage(bg, 0, 0, W, H);
-      else paintHall(ctx);
+      // panorama: schuift met de draaiing van de hal, getegeld zodat hij nooit opraakt
+      const s = ((bgShift % W) + W) % W;
+      if (bg) {
+        ctx.drawImage(bg, s, 0, W, H);
+        if (s > 0) ctx.drawImage(bg, s - W, 0, W, H);
+      } else {
+        ctx.save(); ctx.translate(s, 0); paintHall(ctx); ctx.restore();
+        if (s > 0) { ctx.save(); ctx.translate(s - W, 0); paintHall(ctx); ctx.restore(); }
+      }
     }
 
     /* ---------- projectie ---------- */
-    let camX = 0, camZ = 0;
-    function sx(x, d) { return cx + (x - camX) * f / d; }
+    let camX = 0, camZ = 0, bgShift = 0;
+    function sx(x, d) { return cx + (x + offAt(d) - camX) * f / d; }
     function sy(y, d) { return hy + (camH - y) * f / d; }
+
+    /* ---------- bochten ----------
+       Klassieke pseudo-3D-bocht t.o.v. de huidige looprichting van de speler:
+       kromming twee keer integreren vanaf de speler (stap 1 m), elke x op
+       diepte d schuift op met off(d). Achter de speler: 0. */
+    const offTab = new Float64Array(OFF_N + 1);
+    const nearCorners = [];
+    let offOn = false;
+
+    function buildOff(state, dist) {
+      offOn = false;
+      const T = root.TTR, cs = state.corners;
+      if (!cs || !cs.length || !T || typeof T.curveAt !== 'function') return;
+      nearCorners.length = 0;
+      for (let i = 0; i < cs.length; i++) {
+        const c = cs[i];
+        if (c.z + c.len >= dist && c.z <= dist + OFF_N) nearCorners.push(c);
+      }
+      if (!nearCorners.length) return;
+      offOn = true;
+      let h = 0, o = 0;
+      offTab[0] = 0;
+      for (let i = 1; i <= OFF_N; i++) {
+        h += T.curveAt(nearCorners, dist + i - 0.5);
+        o += h;
+        offTab[i] = o;
+      }
+    }
+
+    function offAt(d) {
+      if (!offOn) return 0;
+      const dd = d - CAM_BACK;
+      if (dd <= 0) return 0;
+      let o;
+      if (dd >= OFF_N) o = offTab[OFF_N];
+      else { const i = dd | 0, t = dd - i; o = offTab[i] + (offTab[i + 1] - offTab[i]) * t; }
+      const lim = OFF_CLAMP * W * d / f;   // op het scherm nooit meer dan ±OFF_CLAMP·W opzij
+      return o > lim ? lim : o < -lim ? -lim : o;
+    }
+
+    // dieptes voor gebogen lijnen op de vloer (geometrisch verdeeld)
+    const steps = [];
+    function depthSteps(dA, dB, n) {
+      steps.length = 0;
+      const r = dB / dA;
+      for (let i = 0; i <= n; i++) steps.push(dA * Math.pow(r, i / n));
+      return steps;
+    }
+
+    // band op de vloer tussen x0..x1, van diepte dA tot dB, volgt de bocht
+    function stripFloor(x0, x1, dA, dB) {
+      if (!offOn) { quadFloor(x0, x1, dA, dB); return; }
+      depthSteps(dA, dB, STRIP_STEPS);
+      ctx.moveTo(sx(x0, steps[0]), sy(0, steps[0]));
+      for (let i = 1; i < steps.length; i++) ctx.lineTo(sx(x0, steps[i]), sy(0, steps[i]));
+      for (let i = steps.length - 1; i >= 0; i--) ctx.lineTo(sx(x1, steps[i]), sy(0, steps[i]));
+      ctx.closePath();
+    }
 
     function quadFloor(x0, x1, d0, d1) {   // vlak op y=0 tussen x0..x1 en dieptes d0..d1
       ctx.moveTo(sx(x0, d0), sy(0, d0));
@@ -225,7 +329,7 @@
       // dwarse parketbanden
       const z0 = Math.floor((camZ + dNear) / BAND);
       const z1 = Math.ceil((camZ + dFar) / BAND);
-      ctx.fillStyle = 'rgba(70,35,10,0.10)';
+      ctx.fillStyle = 'rgba(90,35,8,0.13)';
       ctx.beginPath();
       for (let i = z0; i <= z1; i++) {
         if (hash(i) < 0.4) {
@@ -236,7 +340,7 @@
         }
       }
       ctx.fill();
-      ctx.fillStyle = 'rgba(255,230,190,0.10)';
+      ctx.fillStyle = 'rgba(255,190,140,0.10)';
       ctx.beginPath();
       for (let i = z0; i <= z1; i++) {
         if (hash(i) > 0.7) {
@@ -248,7 +352,7 @@
       }
       ctx.fill();
       // naden
-      ctx.strokeStyle = 'rgba(60,30,10,0.18)';
+      ctx.strokeStyle = 'rgba(80,30,5,0.2)';
       ctx.lineWidth = 1;
       ctx.beginPath();
       for (let i = z0; i <= z1; i++) {
@@ -260,22 +364,26 @@
       }
       // planken in de lengte
       const xMax = (W / 2) * dNear / f + Math.abs(camX) + PLANK;
-      const k0 = Math.ceil(-xMax / PLANK), k1 = Math.floor(xMax / PLANK);
+      // in een bocht: extra planken aan de kant waar de baan naartoe draait
+      const offFar = offOn ? clamp(offAt(dFar), -12, 12) : 0;
+      const k0 = Math.ceil((-xMax + Math.min(0, offFar)) / PLANK), k1 = Math.floor((xMax + Math.max(0, offFar)) / PLANK);
+      if (offOn) depthSteps(dNear, dFar, STRIP_STEPS);
       for (let k = k0; k <= k1; k++) {
         const x = k * PLANK;
         ctx.moveTo(sx(x, dNear), sy(0, dNear));
-        ctx.lineTo(sx(x, dFar), sy(0, dFar));
+        if (offOn) for (let i = 1; i < steps.length; i++) ctx.lineTo(sx(x, steps[i]), sy(0, steps[i]));
+        else ctx.lineTo(sx(x, dFar), sy(0, dFar));
       }
       ctx.stroke();
 
-      // zijlijnen van het speelveld (taps)
-      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      // zijlijnen van het speelveld (taps, volgen de bocht)
+      ctx.fillStyle = C.line;
       ctx.beginPath();
-      quadFloor(-COURT_X - 0.05, -COURT_X + 0.05, dNear, dFar);
-      quadFloor(COURT_X - 0.05, COURT_X + 0.05, dNear, dFar);
+      stripFloor(-COURT_X - 0.05, -COURT_X + 0.05, dNear, dFar);
+      stripFloor(COURT_X - 0.05, COURT_X + 0.05, dNear, dFar);
       ctx.fill();
       // baanscheiding: subtiele streepjes die meeschuiven
-      ctx.fillStyle = 'rgba(255,255,255,0.28)';
+      ctx.fillStyle = 'rgba(245,233,200,0.32)';
       ctx.beginPath();
       const dash = 3, on = 1.5;
       const j0 = Math.floor((camZ + dNear) / dash), j1 = Math.ceil((camZ + 50) / dash);
@@ -291,7 +399,7 @@
       const seg = 2.5, blen = 2.2, bh = 0.6;
       const b0 = Math.floor((camZ + 1) / seg), b1 = Math.ceil((camZ + 55) / seg);
       for (let pass = 0; pass < 2; pass++) {
-        ctx.fillStyle = pass ? C.red : C.blueD;
+        ctx.fillStyle = pass ? C.red : C.blueM;
         ctx.beginPath();
         for (let b = b1; b >= b0; b--) {
           if ((hash(b * 3.1) > 0.45 ? 1 : 0) !== pass) continue;
@@ -309,7 +417,7 @@
         ctx.fill();
       }
       // witte bovenrand van de omheining
-      ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+      ctx.strokeStyle = 'rgba(255,210,63,0.85)';
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       for (let side = -1; side <= 1; side += 2) {
@@ -329,17 +437,33 @@
     }
 
     /* ---------- figuren (in meter, y omhoog = negatief) ---------- */
-    function dotsPath(x0, y0, x1, y1, step, r) {
-      ctx.beginPath();
-      let row = 0;
-      for (let y = y0 + step / 2; y < y1; y += step, row++) {
-        for (let x = x0 + (row % 2 ? step : step / 2); x < x1; x += step) {
-          ctx.moveTo(x + r, y);
-          ctx.arc(x, y, r, 0, Math.PI * 2);
+    /* een vlak vol noppen (rubber met korte noppen naar buiten), in meter.
+       s = pixels per meter: een nop wordt nooit kleiner dan 4 px, dan blijft het goedkoop.
+       Per kleur één pad, dus drie fills per vlak. */
+    function drawPips(x, y, w, h, cell, col, s) {
+      const c = Math.max(cell, 4 / s), r = c * 0.3;
+      ctx.save();
+      ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+      const layers = c * s >= 6 ? 3 : 2;
+      for (let k = 0; k < layers; k++) {
+        const ox = k === 0 ? r * 0.25 : k === 2 ? -r * 0.3 : 0;
+        const oy = k === 0 ? r * 0.35 : k === 2 ? -r * 0.3 : 0;
+        const rr = k === 2 ? r * 0.4 : r;
+        ctx.fillStyle = col[2 - k];
+        ctx.beginPath();
+        let j = 0;
+        for (let py = y + c / 2; py < y + h + c; py += c * 0.87, j++) {
+          for (let px = x + (j % 2 ? c / 2 : 0); px < x + w + c; px += c) {
+            ctx.moveTo(px + ox + rr, py + oy);
+            ctx.arc(px + ox, py + oy, rr, 0, Math.PI * 2);
+          }
         }
+        ctx.fill();
       }
+      ctx.restore();
     }
 
+    /* noppenspeler in PIPS OUT!-tenue, kijkt naar de speler */
     function drawNopper(item, d, frame) {
       const s = f / d;
       const x = (item.lane - 1) * LANE_W;
@@ -351,25 +475,35 @@
       ctx.fillStyle = 'rgba(0,0,0,0.25)';
       ctx.beginPath(); ctx.ellipse(0, 0, 0.4, 0.1, 0, 0, Math.PI * 2); ctx.fill();
       const sway = Math.sin(frame * 0.12 + item.z) * 0.03;
-      // benen
+      // benen, witte sokken en schoenen
       ctx.fillStyle = C.skin;
-      ctx.fillRect(-0.2, -0.8, 0.13, 0.8);
-      ctx.fillRect(0.07, -0.8, 0.13, 0.8);
-      ctx.fillStyle = '#111';
-      ctx.fillRect(-0.22, -0.06, 0.17, 0.06);
-      ctx.fillRect(0.05, -0.06, 0.17, 0.06);
-      // broek
-      ctx.fillRect(-0.25, -0.95, 0.5, 0.25);
-      // shirt: zwart met rode noppen
-      ctx.fillStyle = '#1a1a1a';
-      ctx.fillRect(-0.28, -1.48, 0.56, 0.56);
-      ctx.fillStyle = C.red;
-      dotsPath(-0.28, -1.48, 0.28, -0.92, 0.11, 0.032);
-      ctx.fill();
-      // armen
+      ctx.fillRect(-0.2, -0.62, 0.13, 0.6);
+      ctx.fillRect(0.07, -0.62, 0.13, 0.6);
+      ctx.fillStyle = C.white;
+      ctx.fillRect(-0.2, -0.2, 0.13, 0.12);
+      ctx.fillRect(0.07, -0.2, 0.13, 0.12);
+      ctx.fillStyle = '#e8e8e8';
+      ctx.fillRect(-0.22, -0.08, 0.17, 0.08);
+      ctx.fillRect(0.05, -0.08, 0.17, 0.08);
+      // short
+      ctx.fillStyle = PIPS.shorts;
+      ctx.fillRect(-0.25, -0.95, 0.5, 0.34);
+      // arm links (achter het shirt)
       ctx.fillStyle = C.skin;
-      ctx.fillRect(-0.38, -1.45, 0.1, 0.45);
+      ctx.fillRect(-0.38, -1.42, 0.1, 0.45);
+      ctx.fillStyle = PIPS.shirt;
+      ctx.fillRect(-0.39, -1.48, 0.12, 0.14);
+      ctx.fillStyle = PIPS.trim;
+      ctx.fillRect(-0.39, -1.37, 0.12, 0.03);
+      // shirt: rood rubber met noppen
+      ctx.fillStyle = PIPS.shirt;
+      ctx.fillRect(-0.28, -1.5, 0.56, 0.6);
+      drawPips(-0.28, -1.5, 0.56, 0.6, 0.075, PIPS.pips, s);
+      ctx.fillStyle = PIPS.trim;
+      ctx.fillRect(-0.14, -1.5, 0.28, 0.04);       // boord
+      ctx.fillRect(-0.28, -0.95, 0.56, 0.05);      // zoom
       // hoofd
+      ctx.fillStyle = C.skin;
       ctx.beginPath(); ctx.arc(sway, -1.64, 0.15, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#222';
       ctx.beginPath(); ctx.arc(sway, -1.69, 0.15, Math.PI, Math.PI * 2); ctx.fill();
@@ -379,23 +513,23 @@
       ctx.fillRect(sway + 0.035, -1.65, 0.035, 0.035);
       ctx.fillRect(sway - 0.09, -1.69, 0.07, 0.015);
       ctx.fillRect(sway + 0.02, -1.69, 0.07, 0.015);
-      // grote bat omhoog met rode rubber en zwarte noppen
+      // grote bat omhoog met noppenrubber
       ctx.save();
       ctx.translate(0.33, -1.25);
       ctx.rotate(0.25 + sway);
       ctx.fillStyle = C.skin;
       ctx.fillRect(-0.06, -0.05, 0.1, 0.3);
+      ctx.fillStyle = PIPS.shirt;
+      ctx.fillRect(-0.07, 0.13, 0.12, 0.13);
       ctx.fillStyle = '#8a5a2b';
       ctx.fillRect(-0.035, -0.22, 0.07, 0.2);
       ctx.fillStyle = '#111';
       ctx.beginPath(); ctx.ellipse(0, -0.46, 0.25, 0.28, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = C.red;
+      ctx.fillStyle = PIPS.bat;
       ctx.beginPath(); ctx.ellipse(0, -0.46, 0.225, 0.255, 0, 0, Math.PI * 2); ctx.fill();
       ctx.save();
       ctx.beginPath(); ctx.ellipse(0, -0.46, 0.225, 0.255, 0, 0, Math.PI * 2); ctx.clip();
-      ctx.fillStyle = '#111';
-      dotsPath(-0.24, -0.73, 0.24, -0.19, 0.08, 0.026);
-      ctx.fill();
+      drawPips(-0.23, -0.72, 0.46, 0.52, 0.055, PIPS.pips, s);
       ctx.restore();
       ctx.restore();
       ctx.restore();
@@ -412,7 +546,7 @@
       ctx.beginPath(); quadFloor(x0 + 0.05, x1 - 0.05, d0 + 0.1, d1 - 0.1); ctx.fill();
       // poten
       const lw = Math.max(1, 0.05 * f / d0);
-      ctx.strokeStyle = '#2a2a2a';
+      ctx.strokeStyle = C.legs;
       ctx.lineWidth = lw;
       ctx.beginPath();
       const lz = [d1 - 0.2, d0 + 0.2];
@@ -425,10 +559,10 @@
       }
       ctx.stroke();
       // voorkant
-      ctx.fillStyle = C.greenD;
+      ctx.fillStyle = C.tableD;
       ctx.fillRect(sx(x0, d0), sy(top, d0), sx(x1, d0) - sx(x0, d0), th * f / d0 + 1);
       // blad
-      ctx.fillStyle = C.green;
+      ctx.fillStyle = C.table;
       ctx.beginPath();
       ctx.moveTo(sx(x0, d0), sy(top, d0));
       ctx.lineTo(sx(x1, d0), sy(top, d0));
@@ -618,7 +752,7 @@
       g.restore();
     }
 
-    /* speler, van achteren gezien */
+    /* speler in het clubshirt van TTC Wielsbeke, van achteren gezien */
     function drawPlayer(state) {
       const d = CAM_BACK;
       const s = f / d;
@@ -648,7 +782,7 @@
         const ry = sliding ? 0.55 : 1.15;
         ctx.fillStyle = 'rgba(70,160,255,0.16)';
         ctx.beginPath(); ctx.ellipse(0, sliding ? -0.35 : -0.9, 0.7 + pulse, ry + pulse, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.strokeStyle = 'rgba(120,200,255,0.9)';
+        ctx.strokeStyle = 'rgba(158,212,255,0.95)';
         ctx.lineWidth = 0.05;
         ctx.stroke();
         ctx.strokeStyle = 'rgba(70,160,255,0.35)';
@@ -664,60 +798,75 @@
       const run = dead ? 0 : Math.sin((state.dist || 0) * 2.4);
       if (sliding && !dead) {
         // laag en achterover: benen vooruit, romp achterover, armen opzij
-        ctx.fillStyle = C.blueD;
-        ctx.beginPath(); ctx.ellipse(0, -0.18, 0.3, 0.17, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = C.blue;
-        ctx.beginPath(); ctx.ellipse(0, -0.34, 0.26, 0.18, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = C.red;
-        ctx.fillRect(-0.24, -0.42, 0.48, 0.06);
+        ctx.fillStyle = CLUB.shorts;
+        ctx.beginPath(); ctx.ellipse(0, -0.16, 0.3, 0.16, 0, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = C.skin;
         ctx.fillRect(-0.48, -0.32, 0.22, 0.08);
         ctx.fillRect(0.26, -0.32, 0.18, 0.08);
+        sleeveFlat(-0.3, -0.34, -1);
+        sleeveFlat(0.26, -0.34, 1);
+        // romp
+        ctx.fillStyle = CLUB.shirt;
+        ctx.fillRect(-0.27, -0.46, 0.54, 0.26);
+        ctx.fillStyle = CLUB.hem;
+        ctx.fillRect(-0.27, -0.23, 0.54, 0.04);
+        for (let i = 0; i < 3; i++) {
+          ctx.fillStyle = CLUB.stripes[i];
+          ctx.fillRect(-0.27, -0.4 + i * 0.055, 0.54, 0.04);
+        }
+        ctx.fillStyle = CLUB.trim;
+        ctx.fillRect(-0.12, -0.47, 0.24, 0.035);
         ctx.fillStyle = C.hair;
-        ctx.beginPath(); ctx.arc(0, -0.5, 0.13, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(0, -0.55, 0.13, 0, Math.PI * 2); ctx.fill();
         drawHeldBat(0.5, -0.3, 1.2);
       } else {
         const tuck = y > 0.05 && !dead;
-        // benen
+        // benen met witte sokken en schoenen
         const legL = tuck ? 0.45 : 0.8, liftA = tuck ? 0.25 : Math.max(0, run) * 0.22, liftB = tuck ? 0.15 : Math.max(0, -run) * 0.22;
+        const footA = -0.85 + legL - liftA, footB = -0.85 + legL - liftB;
         ctx.fillStyle = C.skin;
-        ctx.fillRect(-0.19, -0.85, 0.13, legL - liftA + 0.05);
-        ctx.fillRect(0.06, -0.85, 0.13, legL - liftB + 0.05);
-        ctx.fillStyle = '#f2f2f2';
-        ctx.fillRect(-0.21, -0.85 + legL - liftA, 0.17, 0.1);
-        ctx.fillRect(0.04, -0.85 + legL - liftB, 0.17, 0.1);
-        ctx.fillStyle = C.red;
-        ctx.fillRect(-0.21, -0.85 + legL - liftA + 0.07, 0.17, 0.03);
-        ctx.fillRect(0.04, -0.85 + legL - liftB + 0.07, 0.17, 0.03);
-        // broek
-        ctx.fillStyle = C.blueD;
-        ctx.fillRect(-0.24, -1.0, 0.48, 0.24);
-        // shirt
-        ctx.fillStyle = C.blue;
-        ctx.fillRect(-0.27, -1.5, 0.54, 0.54);
-        ctx.fillStyle = C.blueD;
-        ctx.fillRect(-0.27, -1.5, 0.08, 0.54);
-        ctx.fillRect(0.19, -1.5, 0.08, 0.54);
-        ctx.fillStyle = C.red;
-        ctx.fillRect(-0.27, -1.47, 0.54, 0.08);
-        ctx.fillStyle = C.gold;
-        ctx.fillRect(-0.09, -1.32, 0.18, 0.26);
-        ctx.fillStyle = C.blueD;
-        ctx.fillRect(-0.04, -1.28, 0.08, 0.18);
-        // linkerarm zwaait
-        ctx.fillStyle = C.skin;
+        ctx.fillRect(-0.19, -0.85, 0.13, legL - liftA);
+        ctx.fillRect(0.06, -0.85, 0.13, legL - liftB);
+        ctx.fillStyle = C.white;
+        ctx.fillRect(-0.19, footA - 0.12, 0.13, 0.12);
+        ctx.fillRect(0.06, footB - 0.12, 0.13, 0.12);
+        ctx.fillStyle = '#e8e8e8';
+        ctx.fillRect(-0.21, footA - 0.02, 0.17, 0.09);
+        ctx.fillRect(0.04, footB - 0.02, 0.17, 0.09);
+        // short
+        ctx.fillStyle = CLUB.shorts;
+        ctx.fillRect(-0.25, -1.02, 0.5, 0.3);
+        // linkerarm zwaait (met mouwtje)
         ctx.save();
         ctx.translate(-0.3, -1.45);
         ctx.rotate(tuck ? 2.4 : 0.15 + run * 0.35);
+        ctx.fillStyle = C.skin;
         ctx.fillRect(-0.05, 0, 0.1, 0.45);
+        sleeve();
         ctx.restore();
         // rechterarm met bat
         ctx.save();
         ctx.translate(0.3, -1.45);
         const swing = tuck ? -2.2 : -0.5 - run * 0.25;
         ctx.rotate(swing);
+        ctx.fillStyle = C.skin;
         ctx.fillRect(-0.05, 0, 0.1, 0.42);
+        sleeve();
         ctx.restore();
+        // shirt: zwart, drie strepen, witte boord, logootje
+        const top = 1.5, h = 0.56, hw = 0.28;
+        ctx.fillStyle = CLUB.shirt;
+        ctx.fillRect(-hw, -top, hw * 2, h);
+        const th = 0.06, gap = 0.025;
+        for (let i = 0; i < 3; i++) {
+          ctx.fillStyle = CLUB.stripes[i];
+          ctx.fillRect(-hw, -top + h * 0.34 + i * (th + gap), hw * 2, th);
+        }
+        ctx.fillStyle = CLUB.trim;
+        ctx.fillRect(-hw * 0.5, -top, hw, 0.045);
+        ctx.beginPath(); ctx.arc(hw * 0.5, -top + h * 0.17, 0.035, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = CLUB.hem;
+        ctx.fillRect(-hw, -top + h - 0.05, hw * 2, 0.05);
         const hx = 0.3 + Math.sin(-swing) * 0.42, hy2 = -1.45 + Math.cos(-swing) * 0.42;
         drawHeldBat(hx, hy2, -swing * 0.6 + 0.4);
         // nek + hoofd (achterkant: haar)
@@ -730,6 +879,20 @@
       }
       ctx.restore();
 
+      // korte mouw met wit boordje, in het assenstelsel van de arm (arm wijst naar +y)
+      function sleeve() {
+        ctx.fillStyle = CLUB.shirt;
+        ctx.fillRect(-0.075, -0.03, 0.15, 0.15);
+        ctx.fillStyle = CLUB.trim;
+        ctx.fillRect(-0.075, 0.12, 0.15, 0.03);
+      }
+      // mouw bij een zijwaarts gestrekte arm (dir = -1 links, 1 rechts)
+      function sleeveFlat(ax, ay, dir) {
+        ctx.fillStyle = CLUB.shirt;
+        ctx.fillRect(dir < 0 ? ax - 0.06 : ax, ay, 0.12, 0.12);
+        ctx.fillStyle = CLUB.trim;
+        ctx.fillRect(dir < 0 ? ax - 0.06 : ax + 0.09, ay, 0.03, 0.12);
+      }
       function drawHeldBat(bx, by, rot) {
         ctx.save();
         ctx.translate(bx, by);
@@ -745,18 +908,25 @@
     }
 
     /* ---------- HUD ---------- */
-    function hudText(text, x, y, size) {
-      ctx.font = 'bold ' + size + 'px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
-      ctx.lineWidth = Math.max(3, size * 0.2);
-      ctx.strokeStyle = 'rgba(10,15,30,0.85)';
+    function textW(text, size) {
+      const m = ctx.measureText(text);
+      return m && typeof m.width === 'number' && m.width > 0 ? m.width : text.length * size;
+    }
+
+    function hudText(text, x, y, size, color) {
+      ctx.font = size + 'px ' + HUD_FONT;
+      ctx.lineWidth = Math.max(3, size * 0.4);
+      ctx.strokeStyle = C.ink;
       ctx.strokeText(text, x, y);
-      ctx.fillStyle = '#fff';
+      ctx.fillStyle = color || '#fff';
       ctx.fillText(text, x, y);
+      return textW(text, size);
     }
 
     function drawHud(state) {
-      const fs = Math.round(clamp(Math.min(W, H * 1.2) * 0.06, 18, 34));
-      const small = Math.round(fs * 0.55);
+      // Press Start 2P is breed: ~1 em per teken. 360 px: 14 / 10 px.
+      const fs = Math.round(clamp(Math.min(W, H * 1.2) * 0.04, 13, 24));
+      const small = Math.round(clamp(fs * 0.72, 10, 16));
       const pad = Math.round(clamp(W * 0.03, 10, 18));
       const T = root.TTR;
       const score = T && typeof T.scoreOf === 'function'
@@ -766,40 +936,46 @@
       ctx.textAlign = 'left';
       ctx.textBaseline = 'top';
       ctx.lineJoin = 'round';
+      // donkere plaat achter de HUD: de achtergrond schuift mee in bochten
+      const rows = Math.round(small * 1.5) + Math.round(fs * 1.6) + Math.round(small * 1.9) +
+        (state.magnet > 0 ? Math.round(small * 1.9) : 0) + (state.shield ? Math.round(small * 1.9) : 0);
+      const ballsW = (String(state.balls || 0).length + String(Math.floor(state.dist || 0)).length + 3) * small;
+      const boxW = Math.max(String(score).length * fs, ballsW, (state.magnet > 0 ? small * 9.5 : 0), small * 7) + pad * 0.8;
+      ctx.fillStyle = 'rgba(2,19,43,0.55)';
+      ctx.fillRect(pad * 0.5, pad * 0.5, boxW, rows + pad * 0.2);
       let y = pad;
-      hudText('Score', pad, y, small);
-      y += small + 1;
+      hudText('SCORE', pad, y, small, C.gold);
+      y += Math.round(small * 1.5);
       hudText(String(score), pad, y, fs);
-      y += fs + 6;
+      y += Math.round(fs * 1.6);
       // ballen + afstand
       const r = small * 0.45;
       ctx.fillStyle = state.magnet > 0 ? C.gold : '#fff';
-      ctx.strokeStyle = 'rgba(10,15,30,0.85)';
+      ctx.strokeStyle = C.ink;
       ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(pad + r, y + small / 2, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-      const ballTxt = String(state.balls || 0);
-      hudText(ballTxt, pad + r * 2 + 6, y, small);
-      hudText(Math.floor(state.dist || 0) + ' m', pad + r * 2 + 12 + small * (0.62 * ballTxt.length + 1.2), y, small);
-      y += small + 8;
+      const wb = hudText(String(state.balls || 0), pad + r * 2 + 6, y, small);
+      hudText(Math.floor(state.dist || 0) + 'm', pad + r * 2 + 6 + wb + small * 1.2, y, small, C.chrome);
+      y += Math.round(small * 1.9);
       // power-ups
       const cfg = (root.TTR_CONFIG && root.TTR_CONFIG.game) || {};
       if (state.magnet > 0) {
         const full = cfg.magnetFrames || 360;
         const frac = clamp(state.magnet / full, 0, 1);
-        const bw = fs * 3.2, bh = Math.max(6, small * 0.5);
-        drawMagnetIcon(ctx, pad + small * 0.5, y + small * 0.55, small * 0.8);
-        const bx = pad + small * 1.3, by = y + (small - bh) / 2;
-        ctx.fillStyle = 'rgba(10,15,30,0.6)';
+        const bw = small * 6, bh = Math.max(6, small * 0.6);
+        drawMagnetIcon(ctx, pad + small * 0.5, y + small * 0.55, small * 0.9);
+        const bx = pad + small * 1.4, by = y + (small - bh) / 2;
+        ctx.fillStyle = 'rgba(2,19,43,0.7)';
         ctx.fillRect(bx - 1, by - 1, bw + 2, bh + 2);
         ctx.fillStyle = C.gold;
         ctx.fillRect(bx, by, bw * frac, bh);
         hudText(Math.ceil(state.magnet / 60) + 's', bx + bw + 6, y, small);
-        y += small + 8;
+        y += Math.round(small * 1.9);
       }
       if (state.shield) {
-        drawBatIcon(ctx, pad + small * 0.5, y + small * 0.4, small * 0.5, -0.5, C.blue);
-        hudText('Schild', pad + small * 1.3, y, small);
-        y += small + 8;
+        drawBatIcon(ctx, pad + small * 0.5, y + small * 0.4, small * 0.55, -0.5, C.blue);
+        hudText('SCHILD', pad + small * 1.4, y, small, C.chrome);
+        y += Math.round(small * 1.9);
       }
       ctx.restore();
     }
@@ -815,6 +991,13 @@
       camX = px * CAM_FOLLOW;
       camZ = dist - CAM_BACK;
       const frame = state.frame || 0;
+
+      // bochten: verschuivingstabel en panorama
+      buildOff(state, dist);
+      const T = root.TTR;
+      const heading = state.corners && T && typeof T.headingAt === 'function' ? T.headingAt(state.corners, dist) : 0;
+      const dEnd = VIEW_AHEAD + CAM_BACK;
+      bgShift = -heading * W * BG_PAN + offAt(dEnd) * f / dEnd;
 
       ctx.save();
       drawBackground();

@@ -1,28 +1,32 @@
 /* ============================================================
    Tafeltennisrun — layout en thema
-   Kleuren uit het PIPS OUT!-palet.
+   TTC Wielsbeke-Spotit: zelfde palet en lettertype als smash.
    ============================================================ */
 :root{
   --blue-deep:#062a56;
   --blue:#0b3a75;
+  --blue-mid:#1a5ca8;
   --blue-lt:#2f7fd4;
   --blue-hi:#7ec1ff;
+  --chrome:#9ed4ff;
   --red:#c8242a;
+  --red-dark:#8d1519;
   --gold:#ffd23f;
-  --green:#1f7a4a;
   --ink:#02132b;
   --paper:#f4f7fb;
-  --panel:rgba(6,42,86,.92);
-  --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --panel:rgba(6,42,86,.94);
+  --px: 'Press Start 2P', 'Courier New', monospace;
 }
 
 *{ box-sizing:border-box; margin:0; padding:0; }
 html,body{ height:100%; }
 
 body{
-  background:radial-gradient(circle at 50% 30%, #1a5ca8 0%, var(--blue) 45%, #05203f 100%);
+  background:radial-gradient(circle at 50% 30%, var(--blue-mid) 0%, var(--blue) 45%, var(--blue-deep) 100%);
   color:#fff;
-  font-family:var(--font);
+  font-family:var(--px);
+  font-size:11px;
+  line-height:1.6;
   overflow:hidden;
   -webkit-tap-highlight-color:transparent;
   -webkit-user-select:none; user-select:none;
@@ -77,8 +81,8 @@ button{ font:inherit; cursor:pointer; }
   padding:20px 18px;
   border-radius:16px;
   background:var(--panel);
-  border:2px solid var(--blue-lt);
-  box-shadow:0 10px 30px rgba(0,0,0,.45);
+  border:3px solid var(--chrome);
+  box-shadow:0 0 0 3px var(--ink), 0 10px 30px rgba(0,0,0,.45);
   text-align:center;
   z-index:2;
 }
@@ -86,22 +90,26 @@ button{ font:inherit; cursor:pointer; }
 .panel.over{ top:56px; transform:translateX(-50%); max-height:calc(100% - 64px); }
 
 h1{
-  font-size:clamp(30px, 9vw, 44px);
-  font-weight:900;
-  letter-spacing:-.5px;
-  line-height:1;
-  margin-bottom:6px;
+  font-size:clamp(15px, 5.4vw, 28px);
+  font-weight:400;
+  line-height:1.2;
+  margin-bottom:10px;
+  color:var(--chrome);
+  text-shadow:3px 3px 0 var(--ink);
 }
 h1 span{ color:var(--gold); }
-h2{ font-size:28px; margin-bottom:8px; }
-h3{ font-size:16px; margin:14px 0 6px; color:var(--blue-hi); }
+h2{ font-size:clamp(13px, 4.4vw, 20px); font-weight:400; line-height:1.4; margin-bottom:10px; color:var(--gold); text-shadow:2px 2px 0 var(--ink); }
+h3{ font-size:10px; font-weight:400; margin:14px 0 8px; color:var(--chrome); }
 
-.tag{ color:var(--blue-hi); font-weight:600; margin-bottom:12px; }
-.how{ list-style:none; text-align:left; margin:0 auto 12px; display:inline-block; font-size:15px; line-height:1.6; }
-.how b{ color:#fff; }
-.how .blue{ color:var(--blue-hi); }
+.club{ font-size:9px; color:var(--gold); letter-spacing:1px; margin-bottom:8px; }
+.tag{ color:var(--chrome); font-size:10px; margin-bottom:12px; }
+.how{ list-style:none; text-align:left; margin:0 auto 12px; display:inline-block; font-size:9px; line-height:2; }
+.how b{ color:#fff; font-weight:400; }
+.how .red{ color:#ff7a7f; }
+.how .blue{ color:var(--chrome); }
 .how .gold{ color:var(--gold); }
-.keys{ font-size:13px; color:#cfe3ff; margin-bottom:14px; }
+.keys{ font-size:8px; color:#cfe3ff; margin-bottom:14px; }
+.foot{ font-size:8px; color:var(--chrome); opacity:.8; margin-top:10px; }
 .keys .pc{ display:none; }
 @media (hover:hover) and (pointer:fine){
   .keys .touch{ display:none; }
@@ -114,39 +122,40 @@ h3{ font-size:16px; margin:14px 0 6px; color:var(--blue-hi); }
   border:0; border-radius:12px;
   background:var(--red);
   color:#fff;
-  font-size:22px; font-weight:800;
-  box-shadow:0 4px 0 #7d1418;
+  font-family:var(--px);
+  font-size:16px;
+  box-shadow:0 4px 0 var(--red-dark), 0 0 0 3px var(--ink);
   margin:8px 0;
 }
-.big:active{ transform:translateY(2px); box-shadow:0 2px 0 #7d1418; }
+.big:active{ transform:translateY(2px); box-shadow:0 2px 0 var(--red-dark), 0 0 0 3px var(--ink); }
 .small{
   background:none; border:0;
-  color:var(--blue-hi);
+  color:var(--chrome);
   text-decoration:underline;
-  padding:8px; font-size:14px;
+  padding:8px; font-size:9px; line-height:1.6;
 }
-.seed, .best, .sub{ font-size:13px; color:#cfe3ff; margin-top:6px; }
-.final{ font-size:34px; font-weight:900; color:var(--gold); }
+.seed, .best, .sub{ font-size:8px; color:#cfe3ff; margin-top:6px; }
+.final{ font-size:clamp(16px, 5.5vw, 24px); color:var(--gold); text-shadow:2px 2px 0 var(--ink); margin:4px 0; }
 
 form{ margin:12px 0 4px; text-align:left; }
-form label{ font-size:13px; color:#cfe3ff; }
+form label{ font-size:8px; color:#cfe3ff; }
 form .row{ display:flex; gap:6px; margin-top:4px; }
 form input{
   flex:1; min-width:0;
-  padding:10px; font:inherit; font-size:16px;
+  padding:10px; font-family:var(--px); font-size:12px;
   border-radius:10px; border:2px solid var(--blue-lt);
   background:var(--paper); color:var(--ink);
   -webkit-user-select:text; user-select:text;
 }
 form button{
   padding:10px 14px; border:0; border-radius:10px;
-  background:var(--gold); color:var(--ink); font-weight:800;
+  background:var(--gold); color:var(--ink); font-size:10px;
 }
 
 .board ol{
   list-style:none;
   text-align:left;
-  font-size:14px;
+  font-size:9px;
   counter-reset:r;
 }
 .board li{
@@ -155,8 +164,8 @@ form button{
   border-bottom:1px solid rgba(255,255,255,.12);
   counter-increment:r;
 }
-.board li::before{ content:counter(r) "."; width:26px; color:var(--blue-hi); }
+.board li::before{ content:counter(r) "."; width:30px; color:var(--chrome); }
 .board li .n{ flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.board li .s{ font-weight:800; font-variant-numeric:tabular-nums; }
+.board li .s{ color:var(--gold); }
 .board li.me{ background:rgba(255,210,63,.18); border-radius:6px; }
 .board li.empty::before{ content:""; width:0; }
