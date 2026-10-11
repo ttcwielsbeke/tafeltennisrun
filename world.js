@@ -43,8 +43,55 @@
     return lanes;
   }
 
+  /* ---------- bochten ----------
+     Een bocht verandert enkel de richting van de hal, niet de banen:
+     links/rechts blijft baan wisselen. Per stuk hoogstens één bocht,
+     volledig binnen het stuk. Eigen random-stroom, zodat bochten de
+     obstakels niet door elkaar schudden.
+     Corner = { z, len, dir: -1 (links) | 1 (rechts), angle: radialen }  */
+  const CORNER_MARGIN = 12;   // rijen tot zoveel meter vóór de bocht tellen als 'in de bocht'
+
+  function cornersOf(seed, index) {
+    if (index === 0) return [];                  // eerst rustig rechtdoor
+    const rng = makeRng(seed + '#bocht#' + index);
+    if (!rng.chance(0.55)) return [];
+    const len = 40 + rng.int(25);                // 40..64 m
+    const start = index * CHUNK_LEN;
+    const z = round1(start + 10 + rng.next() * (CHUNK_LEN - len - 20));
+    const dir = rng.chance(0.5) ? -1 : 1;
+    const angle = 0.35 + rng.next() * 0.35;      // 20..40 graden
+    return [{ z, len, dir, angle }];
+  }
+
+  // kromming (1/m) op afstand z: zacht in, zacht uit, met als totaal precies 'angle'
+  function curveAt(corners, z) {
+    let k = 0;
+    for (const c of corners) {
+      if (z < c.z || z > c.z + c.len) continue;
+      const t = (z - c.z) / c.len;
+      k += c.dir * (c.angle / c.len) * (1 - Math.cos(2 * Math.PI * t));
+    }
+    return k;
+  }
+
+  // totale draaiing (radialen) van de start tot z: voor het achtergrond-panorama
+  function headingAt(corners, z) {
+    let h = 0;
+    for (const c of corners) {
+      if (z <= c.z) continue;
+      const t = Math.min(1, (z - c.z) / c.len);
+      h += c.dir * c.angle * (t - Math.sin(2 * Math.PI * t) / (2 * Math.PI));
+    }
+    return h;
+  }
+
+  function inCorner(corners, z) {
+    return corners.some((c) => z >= c.z - CORNER_MARGIN && z <= c.z + c.len);
+  }
+
   function generateChunk(seed, index) {
     const rng = makeRng(seed + '#' + index);
+    const corners = cornersOf(seed, index);
     const d = Math.min(1, index / 12);           // moeilijkheid: na ~1,4 km op het maximum
     const start = index * CHUNK_LEN;
     const end = start + CHUNK_LEN;
@@ -58,6 +105,11 @@
       const rowZ = round1(z);
       const row = index + ':' + rowZ;
       const lanes = rowPattern(rng, d);
+      // in een bocht hoogstens één noppenspeler: twee veilige banen, de bocht leest al moeilijk genoeg
+      if (inCorner(corners, rowZ)) {
+        let seen = 0;
+        for (let l = 0; l < 3; l++) if (lanes[l] === 'nopper' && ++seen > 1) lanes[l] = null;
+      }
       lanes.forEach((type, lane) => {
         if (type) add({ type, lane, z: rowZ, len: LEN[type], row });
       });
@@ -113,6 +165,10 @@
     return row.lanes.some((t) => t !== 'nopper');
   }
 
+  TTR.cornersOf = cornersOf;
+  TTR.curveAt = curveAt;
+  TTR.headingAt = headingAt;
+  TTR.inCorner = inCorner;
   TTR.CHUNK_LEN = CHUNK_LEN;
   TTR.MIN_ROW_GAP = MIN_ROW_GAP;
   TTR.ITEM_LEN = LEN;
@@ -120,6 +176,7 @@
   TTR.rowsOf = rowsOf;
   TTR.isRowSafe = isRowSafe;
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { CHUNK_LEN, MIN_ROW_GAP, ITEM_LEN: LEN, generateChunk, rowsOf, isRowSafe };
+    module.exports = { CHUNK_LEN, MIN_ROW_GAP, ITEM_LEN: LEN, generateChunk, rowsOf, isRowSafe,
+      cornersOf, curveAt, headingAt, inCorner };
   }
 })(typeof globalThis !== 'undefined' ? globalThis : this);

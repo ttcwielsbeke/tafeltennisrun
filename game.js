@@ -33,7 +33,7 @@
       dist: 0, speed: c.startSpeed,
       lane: 1, x: 1, y: 0, vy: 0, sliding: 0,
       balls: 0, shield: false, magnet: 0, grace: 0,
-      items: [], events: [], nextChunk: 0
+      items: [], corners: [], events: [], nextChunk: 0
     };
     fill(s);
     return s;
@@ -43,6 +43,7 @@
   function fill(s) {
     while (s.nextChunk * TTR.CHUNK_LEN < s.dist + VIEW_AHEAD) {
       for (const it of TTR.generateChunk(s.seed, s.nextChunk)) s.items.push(Object.assign({}, it));
+      s.corners.push(...TTR.cornersOf(s.seed, s.nextChunk));   // bochten: enkel voor het beeld
       s.nextChunk++;
     }
     if (s.items.length && s.items[0].z + s.items[0].len < s.dist - KEEP_BEHIND) {

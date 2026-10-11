@@ -27,6 +27,10 @@ Succes = een nieuwe speler begrijpt het in 10 seconden, een run duurt 30–90 se
   - **Schild-bat**: één botsing overleven.
   - **Magneet**: ballen in de buurt komen vanzelf naar je toe, een paar seconden.
 - Snelheid neemt langzaam toe. Een nieuwe speler moet 30 seconden kunnen overleven.
+- **Bochten** (wijziging van Jo, 2026-10-11): de hal loopt niet altijd rechtdoor, maar draait af en toe naar links of rechts.
+  Een bocht verandert alleen de richting van de hal, niet de banen: links/rechts blijft baan wisselen, de speler stuurt de bocht niet zelf.
+  De bochten komen uit de seed (iedereen dezelfde bochten op dezelfde dag), obstakels en ballen volgen de bocht,
+  en in en vlak vóór een bocht staat hoogstens één noppenspeler per rij, zodat er altijd twee veilige banen zijn.
 - Score = afstand + verzamelde ballen. Einde bij botsing, daarna meteen opnieuw starten (één tik).
 - Pauze-knop en geluid aan/uit.
 - **Dagelijkse seed**: iedereen krijgt op dezelfde dag dezelfde baanvolgorde. Dat maakt de ranglijst eerlijk. De seed is de datum (bijv. `2026-10-11`). Een "oefen"-modus met willekeurige seed is er ook, maar telt niet mee voor de ranglijst.
@@ -51,10 +55,10 @@ Succes = een nieuwe speler begrijpt het in 10 seconden, een run duurt 30–90 se
   - `style.css` — layout en thema (kleuren als variabelen)
   - `config.js` — Supabase url/key/tabelnaam (zelfde vorm als PIPS OUT!), snelheden, kansen
   - `rng.js` — seedbare random generator (deterministisch voor de dagelijkse seed)
-  - `world.js` — genereert het baanpatroon uit de seed (pure functie, geen DOM)
+  - `world.js` — genereert het baanpatroon en de bochten uit de seed (pure functies, geen DOM): `cornersOf(seed, stuk)`, `curveAt`, `headingAt`
   - `game.js` — hoofdlus, beweging, botsingen, power-ups (geen DOM buiten de canvas)
   - `input.js` — swipe, tik, toetsenbord; vertaalt alles naar acties: `left`, `right`, `jump`, `slide`, `pause`
-  - `render.js` — tekent de hal, speler, obstakels, ballen, HUD
+  - `render.js` — tekent de hal, speler, obstakels, ballen, HUD; in een bocht buigen vloer, lijnen en items mee (pseudo-3D, kromming twee keer geïntegreerd vanaf de speler) en schuift de achterwand mee
   - `board.js` — ranglijst: lezen/schrijven naar Supabase, met lokale fallback
 - Tijd: vaste stap van 1/60 s (fixed timestep), zodat dezelfde seed en invoer altijd hetzelfde resultaat geven. Dat maakt testen mogelijk.
 - Supabase-tabel `runner_scores`:
@@ -102,7 +106,7 @@ Eén Opus-orchestrator leidt de bouw, met subagents per onderdeel. De orchestrat
 4. Integreert, en controleert in de browser-preview: desktop, telefoonbreedte, en de ranglijst met en zonder Supabase.
 5. Eindverslag met wat er klaar is, wat niet, en wat Jo moet beslissen.
 
-Testen: unit-tests op `world.js` en `rng.js` (zelfde seed → zelfde patroon), en een headless check van de hoofdlus met vaste invoer. Visueel controleren in de preview.
+Testen: unit-tests op `world.js` en `rng.js` (zelfde seed → zelfde patroon, zelfde bochten, elke bocht een veilige route), en een headless check van de hoofdlus met vaste invoer. Visueel controleren in de preview.
 
 ## 6. Open vragen (beantwoord door Jo)
 
