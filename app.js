@@ -11,7 +11,7 @@
   const renderer = TTR.createRenderer(canvas);
   // ?lokaal in de url = ranglijst enkel op dit toestel (handig om te testen)
   const boardCfg = Object.assign({}, window.TTR_CONFIG.board);
-  if (/[?&]lokaal/.test(location.search)) boardCfg.provider = 'local';
+  if (/[?&]lokaal(&|=|$)/.test(location.search)) boardCfg.provider = 'local';
   const board = TTR.createBoard(boardCfg);
 
   const screens = { start: $('screen-start'), pause: $('screen-pause'), over: $('screen-over') };
@@ -215,5 +215,5 @@
   requestAnimationFrame(tick);
 
   // voor de browsertest en wie wil spieken: de huidige toestand
-  window.TTR.debug = { get game() { return game; }, get mode() { return mode; } };
+  window.TTR.debug = { board, get game() { return game; }, get mode() { return mode; } };
 })();

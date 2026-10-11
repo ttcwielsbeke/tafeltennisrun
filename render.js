@@ -153,7 +153,7 @@
 
       // clubvlag links
       const bw = clamp(W * 0.12, 30, 120), bh = bw * 0.5;
-      const bx = W * 0.1, by = ceil + (hy - ceil) * 0.18;
+      const bx = W * 0.1, by = ceil + (hy - ceil) * 0.5;
       g.fillStyle = C.blue; g.fillRect(bx, by, bw, bh);
       g.fillStyle = C.red; g.fillRect(bx, by + bh * 0.4, bw, bh * 0.2);
       g.fillStyle = C.gold; g.fillRect(bx, by + bh * 0.85, bw, bh * 0.15);
