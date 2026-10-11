@@ -31,8 +31,8 @@
       accel: 0.07,           // m/s erbij per seconde lopen
 
       /* springen en sliden */
-      jumpVel: 7.6,          // m/s omhoog bij de sprong
-      gravity: 26,           // m/s² naar beneden
+      jumpVel: 9,            // m/s omhoog bij de sprong (0,8 s in de lucht)
+      gravity: 22,           // m/s² naar beneden
       slideFrames: 38,       // hoelang een slide duurt (frames van 1/60 s)
       laneFrames: 8,         // hoelang een baanwissel duurt
 

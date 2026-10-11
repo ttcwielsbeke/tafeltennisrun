@@ -8,7 +8,7 @@
   const makeRng = TTR.makeRng || (typeof require === 'function' && require('./rng.js').makeRng);
 
   const CHUNK_LEN = 120;      // meter per stuk baan
-  const MIN_ROW_GAP = 16;     // twee baanwissels of een volle sprong bij topsnelheid
+  const MIN_ROW_GAP = 18;     // twee baanwissels of een volle sprong bij topsnelheid
   const START_FREE = 40;      // de eerste 40 m is leeg: even op gang komen
   const LEN = { nopper: 0.6, table: 1.5, net: 0.2, machine: 0.8, ball: 0.3, shield: 0.5, magnet: 0.5 };
 
@@ -62,7 +62,7 @@
         if (type) add({ type, lane, z: rowZ, len: LEN[type], row });
       });
 
-      const gap = Math.max(MIN_ROW_GAP, lerp(30, 17, d) + rng.next() * lerp(14, 6, d));
+      const gap = Math.max(MIN_ROW_GAP, lerp(30, 19, d) + rng.next() * lerp(14, 6, d));
 
       // een bal boven een tafel, voor wie durft te springen
       const tableLane = lanes.indexOf('table');
