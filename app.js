@@ -124,8 +124,7 @@
     $('submit-note').textContent = 'Score bewaren…';
     const res = await board.submit({ name, score, seed });
     $('submit-note').textContent = !res.ok ? 'Score kon niet bewaard worden.'
-      : res.source === 'supabase' ? 'Score bewaard als ' + name + '.'
-      : 'Score bewaard op dit toestel (geen verbinding met de clubranking).';
+      : 'Score bewaard als ' + name + (res.source === 'supabase' ? '.' : ', op dit toestel.');
     loadBoard(seed, { name, score });
   }
 
