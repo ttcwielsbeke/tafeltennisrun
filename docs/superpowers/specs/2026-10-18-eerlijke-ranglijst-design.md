@@ -32,7 +32,7 @@ Succes =
 De simulatie is deterministisch: zelfde seed + zelfde acties per frame = zelfde afloop (vaste stap van 1/60 s,
 eigen random generator). De spellogica (`config.js`, `rng.js`, `world.js`, `game.js`) gebruikt enkel
 bewerkingen die in elke JavaScript-engine exact hetzelfde uitkomen (`+ − × ÷`, `Math.imul`, `floor`, `round`,
-`min`, `max`, `abs`, `sign`). `Math.sin`/`Math.cos` zitten alleen in `curveAt`/`headingAt` (bochten), en die
+`min`, `max`, `abs`, `sign`, en `sqrt`, dat IEEE 754 exact laat afronden). `Math.sin`/`Math.cos` zitten alleen in `curveAt`/`headingAt` (bochten), en die
 dienen enkel voor het beeld. Chrome, Safari en de Edge Function (Deno) komen dus op dezelfde score uit.
 
 ## 4. Architectuur en gegevensstroom

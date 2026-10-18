@@ -14,13 +14,13 @@
 
 - No build step, no npm in the game; every browser script follows the existing IIFE pattern ending in `})(typeof globalThis !== 'undefined' ? globalThis : this);` and exports via `module.exports` when present.
 - Comments and all user-facing copy are Dutch; copy strings below are verbatim from the spec.
-- Simulation code may only use exact maths (`+ − × ÷`, `Math.imul/floor/round/min/max/abs/sign`); never `Math.sin/cos/exp/pow/random` in `config.js`, `rng.js`, `world.js`, `game.js`, `replay.js`.
+- Simulation code may only use exact maths (`+ − × ÷`, `Math.imul/floor/round/min/max/abs/sign/sqrt` — `sqrt` is exactly rounded by IEEE 754); never `Math.sin/cos/exp/pow/random` in `config.js`, `rng.js`, `world.js`, `game.js`, `replay.js`.
 - `GAME_VERSION` = `TTR_CONFIG.game.version` = `1`. Any later change to simulation or course generation bumps it in the same commit.
 - Limits: `frames` 1–108 000; `inputs` ≤ 20 000 pairs; body ≤ 256 KB; name 1–16 chars after `cleanName`; secret = 64 hex chars; actions ∈ `left right jump slide`.
 - Course date accepted: today or yesterday in `Europe/Brussels`.
 - Status codes: 400 bad input / wrong date / replay mismatch, 409 name taken, 426 old version, 429 too fast, 500 unexpected.
 - Practice runs are never submitted.
-- Prerequisite: the difficulty ramp (separate track) should be merged before this ships, so version 1 contains it. If it lands later, it bumps `version` to 2.
+- Prerequisite met: this branch is rebased on `difficulty-ramp` (commit 40d9874), so version 1 contains the ramp. `maxSpeed` is 30 m/s, under the 40 m/s DB check.
 
 ## Review Focus
 
