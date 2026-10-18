@@ -81,9 +81,38 @@
   // browsers starten geluid pas na een klik of toets: bij de eerste de context wekken
   for (const ev of ['pointerdown', 'keydown', 'touchstart']) document.addEventListener(ev, () => audio.wake(), true);
 
+  /* ---------- tips voor nieuwe spelers (hints.js) en trillen ---------- */
+  // touch = geen muis: dezelfde test als de .touch/.pc-tekst op het startscherm
+  const touchDevice = !(window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches);
+  let learned = {};
+  try { learned = JSON.parse(load('ttr.tips')) || {}; } catch (e) { learned = {}; }
+  let hint = null;
+  function showHint(h) {
+    if ((h && h.text) !== (hint && hint.text)) {
+      $('hint').textContent = h ? h.text : '';
+      $('hint').hidden = !h;
+    }
+    hint = h;
+  }
+  function updateHint() {
+    if (hint) {
+      const next = TTR.learnFrom(game, hint, learned);
+      if (next[hint.kind] && !learned[hint.kind]) { learned = next; save('ttr.tips', JSON.stringify(learned)); }
+    }
+    showHint(mode === 'run' ? TTR.hintFor(game, learned, touchDevice) : null);
+  }
+  // korte trilling waar het kan (Android); elders doet het niets. Enkel op touch (een pc trilt niet)
+  // en pas na een echte tik of toets: anders weigert Chrome het en klaagt het in de console.
+  function buzz(pattern) {
+    if (!touchDevice || !navigator.vibrate) return;
+    if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return;
+    try { navigator.vibrate(pattern); } catch (e) { /* niet ondersteund */ }
+  }
+
   /* ---------- schermen ---------- */
   function show(name) {
     for (const k in screens) screens[k].hidden = k !== name;
+    if (name !== null) showHint(null);
     $('btn-pause').hidden = name !== null && name !== 'pause' ? true : false;
   }
 
@@ -354,11 +383,14 @@
         if (ev === 'lane') audio.play('lane', { dir: Math.sign(game.lane - lane0) });
         else if (ev === 'ball') audio.play('ball', { double: game.bak > 0 });
         else audio.play(ev);
+        if (ev === 'crash') buzz([60, 40, 120]);
+        else if (ev === 'block') buzz(30);
       }
       if (air0 && game.y <= 0 && game.alive) audio.play('land');
       // om de 500 m juicht het publiek
       const m = Math.floor(game.dist / 500);
       if (m > milestone) { milestone = m; audio.play('cheer'); }
+      updateHint();
       if (!game.alive) gameOver();
     },
     render() { renderer.draw(game); }

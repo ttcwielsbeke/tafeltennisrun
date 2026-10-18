@@ -15,6 +15,7 @@
 <body>
   <main id="app">
     <canvas id="game" aria-label="Speelveld"></canvas>
+    <p id="hint" class="hint" role="status" aria-live="polite" hidden></p>
 
     <div class="corner" data-ui>
       <button id="btn-pause" class="icon" type="button" aria-label="Pauze" title="Pauze (P)">&#10073;&#10073;</button>
@@ -111,6 +112,7 @@
   <script src="skins.js"></script>
   <script src="input.js"></script>
   <script src="audio.js"></script>
+  <script src="hints.js"></script>
   <script src="render.js"></script>
   <script src="board.js"></script>
   <script src="app.js"></script>

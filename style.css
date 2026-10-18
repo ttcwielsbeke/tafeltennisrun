@@ -212,3 +212,26 @@ form button{
 }
 .tabs button[aria-selected="true"]{ background:var(--chrome); color:var(--ink); }
 .board li .d{ color:#8aa6c8; font-size:7px; align-self:center; }
+
+/* tip voor nieuwe spelers: over de achterwand, onder de score, nooit over de baan */
+.hint{
+  position:absolute; left:50%; top:17%;
+  transform:translateX(-50%);
+  width:max-content; max-width:88%;
+  padding:8px 12px; border-radius:10px;
+  background:rgba(2,19,43,.6); border:2px solid var(--gold);
+  color:var(--gold); text-align:center;
+  font-size:clamp(10px, 3.4vw, 15px); line-height:1.6;
+  text-shadow:2px 2px 0 var(--ink);
+  pointer-events:none;            /* vegen gaat gewoon door */
+  z-index:1;
+  animation:hint-pulse 1s ease-in-out infinite alternate;
+}
+.hint[hidden]{ display:none; }
+@keyframes hint-pulse{ from{ transform:translateX(-50%) scale(1); } to{ transform:translateX(-50%) scale(1.06); } }
+
+/* minder beweging gevraagd: geen animaties of indrukeffecten */
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{ animation:none !important; transition:none !important; }
+  .big:active, .mid:active{ transform:none; }
+}

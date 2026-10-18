@@ -35,6 +35,12 @@ Open `index.html` of speel online (GitHub Pages, zie onder).
 - Geluid staat standaard uit (knop rechtsboven); je keuze wordt onthouden. Alles is gesynthetiseerd: sneakerpiep
   bij een slide, een echte "pok" per bal (na elkaar gepakt klimt de toon), het fluitje van de scheidsrechter bij
   een time-out, publiek dat juicht om de 500 m, en zacht geroezemoes met rally's aan tafels verderop.
+- **Tips voor nieuwe spelers**: komt er een noppenspeler, tafel of net op je af die je nog nooit
+  voorbij bent, dan verschijnt bovenaan wat je moet doen (vegen op een gsm, pijltjes op een pc). Ben je
+  er één keer levend voorbij, dan komt die tip niet meer (onthouden op dit toestel).
+- **Minder beweging**: staat "beweging beperken" aan op je toestel, dan vallen de snelheidsstrepen,
+  het knipperen na een schild en de animaties weg. Het spel zelf blijft hetzelfde.
+- **Trillen**: op een Android-gsm trilt het kort bij een botsing en als het schild je redt.
 
 Bij je eerste score vraagt het spel je naam (max. 16 tekens); die wordt onthouden op je toestel.
 Je naam hangt aan een geheim dat in je browser bewaard blijft: speel je in een privévenster of wis je de
@@ -67,6 +73,7 @@ node --test
 - `test/skins.test.js`: welke tenues bij welke beste score horen, en dat elk tenue een tekening heeft.
 - `test/board.test.js`: de ranglijst aller tijden houdt per speler de beste score, ook via Supabase, met terugval op lokaal.
 - `test/audio.test.js`: zonder Web Audio loopt het spel gewoon (geluid doet dan niets), en elke gebeurtenis heeft een geluid.
+- `test/hints.test.js`: welke tip bij welk obstakel hoort, wanneer niet, en wanneer je een soort geleerd hebt.
 - `test/replay.test.js`: een opgenomen run geeft bij herberekening exact dezelfde afloop, pauzes tellen niet, foute invoer wordt geweigerd.
 - `test/sync.test.js`: de kopie van de spelcode in `supabase/functions/_shared/` is gelijk aan het origineel.
 - `test/submit-core.test.js`: de controles van de Edge Function: vorm, versie, datumvenster, herberekening, tempolimiet en de vaste meldingen.
@@ -206,6 +213,7 @@ Het lege bestand `.nojekyll` zorgt dat GitHub de bestanden ongewijzigd serveert.
 | `skins.js` | welke tenues je met je beste score vrijspeelt |
 | `input.js` | vegen, tikken en toetsen → `left` `right` `jump` `slide` `pause` |
 | `audio.js` | alle geluiden, gesynthetiseerd met Web Audio, en de sfeer in de hal |
+| `hints.js` | tips voor nieuwe spelers: welke tip nu, en wanneer een soort obstakel geleerd is |
 | `render.js` | tekent de hal, de speler, de obstakels en de HUD |
 | `board.js` | ranglijst: Supabase, met `localStorage` als vangnet |
 | `app.js` | schermen, knoppen, geluid en de animatielus |

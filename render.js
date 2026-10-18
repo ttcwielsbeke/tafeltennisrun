@@ -89,6 +89,15 @@
       }
     } catch (e) { /* geen fonts-api */ }
     let kit = KITS.club;    // tenue van de speler
+    // "minder beweging" van het toestel: geen strepen, niet knipperen, rustigere effecten
+    let calm = false;
+    try {
+      const mq = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');
+      if (mq) {
+        calm = mq.matches;
+        if (mq.addEventListener) mq.addEventListener('change', (e) => { calm = e.matches; });
+      }
+    } catch (e) { /* geen matchMedia */ }
     const list = [];        // hergebruikte tekenlijst
     const tableRows = {};   // row -> bitmasker van banen met tafel
 
@@ -1121,9 +1130,9 @@
       ctx.globalAlpha = 1 - t;
       ctx.strokeStyle = col;
       ctx.lineWidth = Math.max(1.5, 0.05 * s * (1 - t));
-      ctx.beginPath(); ctx.arc(px, py, (0.15 + t * 0.55) * s, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(px, py, (calm ? 0.35 : 0.15 + t * 0.55) * s, 0, Math.PI * 2); ctx.stroke();
       ctx.beginPath();
-      for (let i = 0; i < 8; i++) {
+      for (let i = 0; i < (calm ? 0 : 8); i++) {
         const a = i * Math.PI / 4 + 0.3, r0 = (0.25 + t * 0.5) * s, r1 = r0 + 0.18 * s * (1 - t);
         ctx.moveTo(px + Math.cos(a) * r0, py + Math.sin(a) * r0);
         ctx.lineTo(px + Math.cos(a) * r1, py + Math.sin(a) * r1);
@@ -1138,7 +1147,7 @@
         ctx.lineJoin = 'round';
         ctx.lineWidth = Math.max(3, fs * 0.35);
         ctx.strokeStyle = C.ink;
-        const ty = py - (0.5 + t * 0.6) * s;
+        const ty = py - (calm ? 0.6 : 0.5 + t * 0.6) * s;
         ctx.strokeText('+' + pts, px + 0.5 * s, ty);
         ctx.fillStyle = pts > (cfg.ballPoints || 10) ? C.gold : '#fff';
         ctx.fillText('+' + pts, px + 0.5 * s, ty);
@@ -1150,7 +1159,7 @@
     function drawSpeed(state) {
       const v = state.vel || 0;
       const k = clamp((v - 13) / 9, 0, 1);
-      if (k <= 0 || state.alive === false) return;
+      if (k <= 0 || state.alive === false || calm) return;
       const R = Math.hypot(W, H - hy);
       const t0 = (state.dist || 0) * 0.045;
       ctx.save();
@@ -1320,7 +1329,7 @@
       ctx.save();
       ctx.translate(sx(x, d), sy(y, d));
       ctx.scale(s, s);
-      if (!dead && state.grace > 0) ctx.globalAlpha *= 0.55 + 0.35 * Math.cos(frame * 0.5);
+      if (!dead && state.grace > 0) ctx.globalAlpha *= calm ? 0.55 : 0.55 + 0.35 * Math.cos(frame * 0.5);
 
       // aura's
       if (state.magnet > 0) {
@@ -1384,7 +1393,7 @@
         // lopen: heupen en schouders draaien tegen elkaar in, het lijf veert
         const ph = dead ? 0 : (state.dist || 0) * 2.4;
         const a = Math.sin(ph);
-        const bob = dead ? 0 : 0.05 * Math.abs(a);
+        const bob = dead ? 0 : (calm ? 0.02 : 0.05) * Math.abs(a);
         ctx.translate(0, -bob);
         const liftL = Math.max(0, a), liftR = Math.max(0, -a);
         leg(-0.12, -0.86, -0.13, -0.46 - liftL * 0.1, -0.12, -0.06 - liftL * 0.4 + bob, liftL);
