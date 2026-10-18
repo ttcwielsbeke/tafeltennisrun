@@ -28,6 +28,38 @@
     machine: 'Kopbal tegen de ballenmachine!'
   };
 
+  /* ---------- tenues: vrijgespeeld met de beste score op dit toestel ---------- */
+  const SKINS = window.TTR_CONFIG.skins;
+  function load(key) { try { return localStorage.getItem(key); } catch (e) { return null; } }
+  function save(key, v) { try { localStorage.setItem(key, String(v)); } catch (e) { /* privévenster */ } }
+  let deviceBest = Number(load('ttr.best')) || 0;
+  let skin = load('ttr.skin') || 'club';
+  if (!TTR.unlockedSkins(deviceBest, SKINS).some((k) => k.id === skin)) skin = 'club';
+  let browse = skin;          // het tenue dat nu in de kiezer staat
+
+  function showSkin() {
+    const k = SKINS.find((x) => x.id === browse) || SKINS[0];
+    const open = deviceBest >= k.at;
+    const kit = TTR.KITS[k.id];
+    $('skin-name').textContent = k.name;
+    $('skin-swatch').style.background = 'linear-gradient(' + kit.shirt + ' 0 40%,' +
+      kit.stripes.map((c, i) => c + ' ' + (40 + i * 10) + '% ' + (48 + i * 10) + '%').join(',') +
+      ',' + kit.shirt + ' 68% 100%)';
+    $('skin-picker').classList.toggle('locked', !open);
+    $('skin-lock').textContent = open ? '' : 'Vrij vanaf ' + k.at + ' punten';
+    if (open) { skin = browse; save('ttr.skin', skin); renderer.setSkin(skin); }
+  }
+  function nextSkin(dir) { browse = TTR.cycleSkin(browse, dir, SKINS); showSkin(); }
+
+  // na een run: beste score bijwerken en melden wat er vrijkwam
+  function recordBest(score) {
+    if (score <= deviceBest) return [];
+    const fresh = TTR.newSkins(deviceBest, score, SKINS);
+    deviceBest = score;
+    save('ttr.best', score);
+    return fresh;
+  }
+
   /* ---------- geluid: standaard uit ---------- */
   let soundOn = false;
   let ac = null;
@@ -50,6 +82,8 @@
     ball:   () => { beep(1320, 0.06, 'sine', 0.06); beep(1760, 0.08, 'sine', 0.04); },
     shield: () => { beep(523, 0.08, 'square', 0.05); beep(784, 0.12, 'square', 0.05); },
     magnet: () => { beep(660, 0.08, 'square', 0.05); beep(990, 0.12, 'square', 0.05); },
+    timeout: () => beep(880, 0.35, 'sine', 0.06, 440),
+    bak:    () => { beep(784, 0.07, 'square', 0.05); beep(1046, 0.07, 'square', 0.05); beep(1568, 0.1, 'square', 0.04); },
     block:  () => beep(200, 0.2, 'sawtooth', 0.07, 90),
     crash:  () => beep(160, 0.45, 'sawtooth', 0.09, 50)
   };
@@ -105,6 +139,10 @@
       (game.balls === 1 ? ' bal' : ' ballen') + (practice ? ' · oefenronde' : '');
     $('submit-note').textContent = '';
     $('name-form').hidden = true;
+    const fresh = recordBest(score);
+    $('unlock-note').hidden = !fresh.length;
+    $('unlock-note').textContent = fresh.length
+      ? 'Nieuw tenue: ' + fresh.map((k) => k.name).join(' en ') + '! Kies het bij de start.' : '';
     show('over');
 
     const seed = game.seed;
@@ -169,6 +207,7 @@
       if (a === 'jump' && performance.now() - overAt > 400) start(practice);
     } else if (mode === 'start') {
       if (a === 'jump') start(false);
+      else if (a === 'left' || a === 'right') nextSkin(a === 'left' ? -1 : 1);
     }
   }
   TTR.createInput($('app'), onAction);
@@ -178,8 +217,11 @@
   $('btn-again').addEventListener('click', () => start(practice));
   $('btn-resume').addEventListener('click', resume);
   $('btn-pause').addEventListener('click', () => (mode === 'run' ? pause() : resume()));
-  $('btn-quit').addEventListener('click', () => { mode = 'start'; show('start'); showBest(); });
-  $('btn-home').addEventListener('click', () => { mode = 'start'; show('start'); showBest(); });
+  function home() { mode = 'start'; browse = skin; showSkin(); show('start'); showBest(); }
+  $('btn-quit').addEventListener('click', home);
+  $('btn-home').addEventListener('click', home);
+  $('skin-prev').addEventListener('click', (e) => { nextSkin(-1); e.currentTarget.blur(); });
+  $('skin-next').addEventListener('click', (e) => { nextSkin(1); e.currentTarget.blur(); });
   $('btn-sound').addEventListener('click', (e) => { setSound(!soundOn); e.currentTarget.blur(); });
   $('name-form').addEventListener('submit', (e) => {
     e.preventDefault();
@@ -209,6 +251,8 @@
 
   $('seed-today').textContent = TTR.dailySeed();
   setSound(false);
+  renderer.setSkin(skin);
+  showSkin();
   show('start');
   showBest();
   requestAnimationFrame(tick);

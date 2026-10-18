@@ -73,6 +73,31 @@ test('schild vangt één botsing op, magneet trekt ballen aan', () => {
   assert.equal(s.balls, 1);
 });
 
+test('time-out maakt 5 s trager en komt daarna weer op snelheid', () => {
+  const a = G.createGame('x'), b = G.createGame('x');
+  for (const s of [a, b]) { s.items = []; s.nextChunk = 99; }
+  b.items = [{ id: 'to', type: 'timeout', lane: 1, z: 1, len: 0.5 }];
+  for (let i = 0; i < 60; i++) { G.step(a, []); G.step(b, []); }
+  assert.equal(b.timeout > 0, true);
+  assert.ok(b.vel < a.vel * 0.7, 'vel=' + b.vel);
+  assert.ok(b.dist < a.dist);
+  for (let i = 0; i < 300; i++) { G.step(a, []); G.step(b, []); }
+  assert.equal(b.timeout, 0);
+  assert.equal(b.vel, a.vel);              // de onderliggende snelheid liep gewoon door
+});
+
+test('ballenbak geeft 10 s dubbele punten per bal', () => {
+  const s = G.createGame('x');
+  s.items = [{ id: 'b0', type: 'ball', lane: 1, z: 1, len: 0.3 },
+             { id: 'bk', type: 'bak', lane: 1, z: 2, len: 0.5 },
+             { id: 'b1', type: 'ball', lane: 1, z: 4, len: 0.3 }];
+  s.nextChunk = 99;
+  for (let i = 0; i < 40; i++) G.step(s, []);
+  assert.equal(s.balls, 2);
+  assert.equal(s.points, s.cfg.ballPoints * 3);   // 1× + 2×
+  assert.equal(G.scoreOf(s), Math.floor(s.dist) + s.points);
+});
+
 test('de lus doet vaste stappen van 1/60 s, los van de beeldsnelheid', () => {
   let updates = 0;
   const loop = G.createLoop({ update() { updates++; }, render() {} });
@@ -87,5 +112,5 @@ test('de lus doet vaste stappen van 1/60 s, los van de beeldsnelheid', () => {
 // Dan bewust opnieuw berekenen en hier aanpassen.
 const GOLDEN = {
   script: { frame: 430, score: 73, alive: false, crashedBy: 'table' },   // onder het net door, dan tegen een tafel
-  bot: { frame: 7200, score: 2204, balls: 50, alive: true }
+  bot: { frame: 7200, score: 2204, balls: 45, alive: true }
 };

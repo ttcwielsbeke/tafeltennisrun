@@ -3,7 +3,7 @@
 const G = require('../game.js');
 
 function bot(s) {
-  const reach = s.speed * 0.45;
+  const reach = s.vel * 0.45;
   const near = s.items
     .filter((i) => !i.taken && !i.broken && G.SPAN[i.type] && i.z + i.len > s.dist && i.z < s.dist + reach && i.lane === s.lane);
   if (!near.length) return [];
@@ -16,7 +16,7 @@ function bot(s) {
     if (free > s.lane) return ['right'];
     return [];
   }
-  if (it.type === 'table') return it.z - s.dist < s.speed * 0.25 ? ['jump'] : [];
+  if (it.type === 'table') return it.z - s.dist < s.vel * 0.25 ? ['jump'] : [];
   return s.sliding ? [] : ['slide'];
 }
 

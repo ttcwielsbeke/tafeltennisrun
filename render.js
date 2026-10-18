@@ -45,6 +45,16 @@
                  stripes: ['#e4474c', '#c6a743', '#2eb1c2'] };
   const PIPS = { shirt: '#c8242a', trim: '#8d1519', hem: '#8d1519', shorts: '#1c2430',
                  pips: ['#f0716a', '#d94a44', '#8b1a1f'], bat: '#c8242a' };
+  /* vrij te spelen tenues van de speler (drempels in config.js) */
+  const KITS = {
+    club:     Object.assign({}, CLUB, { bat: C.red }),
+    trainer:  { shirt: '#0b3a75', trim: '#9ed4ff', hem: '#062a56', shorts: '#111111',
+                stripes: CLUB.stripes, bat: C.red, longSleeves: true },
+    links:    Object.assign({}, CLUB, { bat: C.red, mirror: true }),
+    groen:    Object.assign({}, CLUB, { bat: '#2fa84f', batPips: ['#9cf0a8', '#2fa84f', '#14602a'] }),
+    kampioen: { shirt: '#e0b520', trim: '#fff6c8', hem: '#a88410', shorts: '#111111',
+                stripes: ['#e4474c', '#161616', '#2eb1c2'], bat: C.red }
+  };
   const HUD_FONT = '"Press Start 2P", monospace';
 
   function hash(n) {
@@ -60,6 +70,7 @@
     let f = 1, camH = 3, cx = 0, hy = 0;
     let fogGrad = null;
     let bg = null, bgKey = '';
+    let kit = KITS.club;    // tenue van de speler
     const list = [];        // hergebruikte tekenlijst
     const tableRows = {};   // row -> bitmasker van banen met tafel
 
@@ -716,8 +727,47 @@
         ctx.fillStyle = 'rgba(255,210,63,0.22)';
         ctx.beginPath(); ctx.arc(0, 0, 0.4, 0, Math.PI * 2); ctx.fill();
         drawMagnetIcon(ctx, 0, 0.04, 0.28);
+      } else if (item.type === 'timeout') {
+        ctx.fillStyle = 'rgba(158,212,255,0.25)';
+        ctx.beginPath(); ctx.arc(0, 0, 0.42, 0, Math.PI * 2); ctx.fill();
+        drawTimeoutIcon(ctx, 0, 0, 0.3);
+      } else if (item.type === 'bak') {
+        ctx.fillStyle = 'rgba(255,210,63,0.22)';
+        ctx.beginPath(); ctx.arc(0, 0, 0.42, 0, Math.PI * 2); ctx.fill();
+        drawBakIcon(ctx, 0, 0.02, 0.3);
       }
       ctx.restore();
+    }
+
+    /* time-out: het witte T-kaartje van de scheidsrechter */
+    function drawTimeoutIcon(g, x, y, r) {
+      g.save();
+      g.translate(x, y);
+      g.fillStyle = C.ink;
+      g.fillRect(-r * 0.72, -r * 0.92, r * 1.44, r * 1.84);
+      g.fillStyle = '#ffffff';
+      g.fillRect(-r * 0.62, -r * 0.82, r * 1.24, r * 1.64);
+      g.fillStyle = C.blueD;
+      g.fillRect(-r * 0.42, -r * 0.55, r * 0.84, r * 0.26);
+      g.fillRect(-r * 0.13, -r * 0.55, r * 0.26, r * 1.1);
+      g.restore();
+    }
+
+    /* ballenbak: een blauwe bak vol witte ballen, x2 */
+    function drawBakIcon(g, x, y, r) {
+      g.save();
+      g.translate(x, y);
+      g.fillStyle = '#ffffff';
+      for (const [bx, by] of [[-0.42, -0.3], [0, -0.38], [0.42, -0.3], [-0.2, -0.5], [0.22, -0.52]]) {
+        g.beginPath(); g.arc(bx * r, by * r, r * 0.24, 0, Math.PI * 2); g.fill();
+      }
+      g.fillStyle = C.ink;
+      g.fillRect(-r * 0.82, -r * 0.32, r * 1.64, r * 1.02);
+      g.fillStyle = C.table;
+      g.fillRect(-r * 0.74, -r * 0.24, r * 1.48, r * 0.86);
+      g.fillStyle = C.gold;
+      g.fillRect(-r * 0.74, -r * 0.24, r * 1.48, r * 0.14);
+      g.restore();
     }
 
     function drawBatIcon(g, x, y, r, rot, color) {
@@ -794,27 +844,31 @@
         ctx.rotate(1.35);
         ctx.translate(0.2, 0.25);
       }
+      // linkshandige: de hele speler gespiegeld, het logootje blijft op zijn plaats
+      const mir = kit.mirror ? -1 : 1;
+      if (kit.mirror) ctx.scale(-1, 1);
+      const arm = kit.longSleeves ? kit.shirt : C.skin;
 
       const run = dead ? 0 : Math.sin((state.dist || 0) * 2.4);
       if (sliding && !dead) {
         // laag en achterover: benen vooruit, romp achterover, armen opzij
-        ctx.fillStyle = CLUB.shorts;
+        ctx.fillStyle = kit.shorts;
         ctx.beginPath(); ctx.ellipse(0, -0.16, 0.3, 0.16, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = C.skin;
+        ctx.fillStyle = arm;
         ctx.fillRect(-0.48, -0.32, 0.22, 0.08);
         ctx.fillRect(0.26, -0.32, 0.18, 0.08);
         sleeveFlat(-0.3, -0.34, -1);
         sleeveFlat(0.26, -0.34, 1);
         // romp
-        ctx.fillStyle = CLUB.shirt;
+        ctx.fillStyle = kit.shirt;
         ctx.fillRect(-0.27, -0.46, 0.54, 0.26);
-        ctx.fillStyle = CLUB.hem;
+        ctx.fillStyle = kit.hem;
         ctx.fillRect(-0.27, -0.23, 0.54, 0.04);
         for (let i = 0; i < 3; i++) {
-          ctx.fillStyle = CLUB.stripes[i];
+          ctx.fillStyle = kit.stripes[i];
           ctx.fillRect(-0.27, -0.4 + i * 0.055, 0.54, 0.04);
         }
-        ctx.fillStyle = CLUB.trim;
+        ctx.fillStyle = kit.trim;
         ctx.fillRect(-0.12, -0.47, 0.24, 0.035);
         ctx.fillStyle = C.hair;
         ctx.beginPath(); ctx.arc(0, -0.55, 0.13, 0, Math.PI * 2); ctx.fill();
@@ -834,13 +888,13 @@
         ctx.fillRect(-0.21, footA - 0.02, 0.17, 0.09);
         ctx.fillRect(0.04, footB - 0.02, 0.17, 0.09);
         // short
-        ctx.fillStyle = CLUB.shorts;
+        ctx.fillStyle = kit.shorts;
         ctx.fillRect(-0.25, -1.02, 0.5, 0.3);
         // linkerarm zwaait (met mouwtje)
         ctx.save();
         ctx.translate(-0.3, -1.45);
         ctx.rotate(tuck ? 2.4 : 0.15 + run * 0.35);
-        ctx.fillStyle = C.skin;
+        ctx.fillStyle = arm;
         ctx.fillRect(-0.05, 0, 0.1, 0.45);
         sleeve();
         ctx.restore();
@@ -849,23 +903,23 @@
         ctx.translate(0.3, -1.45);
         const swing = tuck ? -2.2 : -0.5 - run * 0.25;
         ctx.rotate(swing);
-        ctx.fillStyle = C.skin;
+        ctx.fillStyle = arm;
         ctx.fillRect(-0.05, 0, 0.1, 0.42);
         sleeve();
         ctx.restore();
         // shirt: zwart, drie strepen, witte boord, logootje
         const top = 1.5, h = 0.56, hw = 0.28;
-        ctx.fillStyle = CLUB.shirt;
+        ctx.fillStyle = kit.shirt;
         ctx.fillRect(-hw, -top, hw * 2, h);
         const th = 0.06, gap = 0.025;
         for (let i = 0; i < 3; i++) {
-          ctx.fillStyle = CLUB.stripes[i];
+          ctx.fillStyle = kit.stripes[i];
           ctx.fillRect(-hw, -top + h * 0.34 + i * (th + gap), hw * 2, th);
         }
-        ctx.fillStyle = CLUB.trim;
+        ctx.fillStyle = kit.trim;
         ctx.fillRect(-hw * 0.5, -top, hw, 0.045);
-        ctx.beginPath(); ctx.arc(hw * 0.5, -top + h * 0.17, 0.035, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = CLUB.hem;
+        ctx.beginPath(); ctx.arc(hw * 0.5 * mir, -top + h * 0.17, 0.035, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = kit.hem;
         ctx.fillRect(-hw, -top + h - 0.05, hw * 2, 0.05);
         const hx = 0.3 + Math.sin(-swing) * 0.42, hy2 = -1.45 + Math.cos(-swing) * 0.42;
         drawHeldBat(hx, hy2, -swing * 0.6 + 0.4);
@@ -881,16 +935,16 @@
 
       // korte mouw met wit boordje, in het assenstelsel van de arm (arm wijst naar +y)
       function sleeve() {
-        ctx.fillStyle = CLUB.shirt;
+        ctx.fillStyle = kit.shirt;
         ctx.fillRect(-0.075, -0.03, 0.15, 0.15);
-        ctx.fillStyle = CLUB.trim;
+        ctx.fillStyle = kit.trim;
         ctx.fillRect(-0.075, 0.12, 0.15, 0.03);
       }
       // mouw bij een zijwaarts gestrekte arm (dir = -1 links, 1 rechts)
       function sleeveFlat(ax, ay, dir) {
-        ctx.fillStyle = CLUB.shirt;
+        ctx.fillStyle = kit.shirt;
         ctx.fillRect(dir < 0 ? ax - 0.06 : ax, ay, 0.12, 0.12);
-        ctx.fillStyle = CLUB.trim;
+        ctx.fillStyle = kit.trim;
         ctx.fillRect(dir < 0 ? ax - 0.06 : ax + 0.09, ay, 0.03, 0.12);
       }
       function drawHeldBat(bx, by, rot) {
@@ -901,8 +955,19 @@
         ctx.fillRect(-0.03, -0.02, 0.06, 0.16);
         ctx.fillStyle = '#111';          // zwarte kant + rand
         ctx.beginPath(); ctx.ellipse(0, 0.3, 0.15, 0.17, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = C.red;           // rode rubber naar de camera
+        ctx.fillStyle = kit.bat;         // rubber naar de camera
         ctx.beginPath(); ctx.ellipse(0.015, 0.3, 0.125, 0.145, 0, 0, Math.PI * 2); ctx.fill();
+        if (kit.batPips) {               // lange noppen: een raster bolletjes op het rubber
+          ctx.clip();
+          for (let py = 0.17; py < 0.45; py += 0.055) {
+            for (let px = -0.11; px < 0.14; px += 0.055) {
+              ctx.fillStyle = kit.batPips[2];
+              ctx.beginPath(); ctx.arc(px + 0.006, py + 0.006, 0.018, 0, Math.PI * 2); ctx.fill();
+              ctx.fillStyle = kit.batPips[0];
+              ctx.beginPath(); ctx.arc(px, py, 0.016, 0, Math.PI * 2); ctx.fill();
+            }
+          }
+        }
         ctx.restore();
       }
     }
@@ -931,16 +996,26 @@
       const T = root.TTR;
       const score = T && typeof T.scoreOf === 'function'
         ? T.scoreOf(state)
-        : Math.floor(state.dist || 0) + (state.balls || 0) * 10;
+        : Math.floor(state.dist || 0) + (state.points || 0);
       ctx.save();
       ctx.textAlign = 'left';
       ctx.textBaseline = 'top';
       ctx.lineJoin = 'round';
       // donkere plaat achter de HUD: de achtergrond schuift mee in bochten
-      const rows = Math.round(small * 1.5) + Math.round(fs * 1.6) + Math.round(small * 1.9) +
-        (state.magnet > 0 ? Math.round(small * 1.9) : 0) + (state.shield ? Math.round(small * 1.9) : 0);
+      const cfg = (root.TTR_CONFIG && root.TTR_CONFIG.game) || {};
+      // lopende power-ups met een klok: magneet, time-out, ballenbak
+      const timers = [];
+      if (state.magnet > 0) timers.push({ left: state.magnet, full: cfg.magnetFrames || 360, color: C.gold,
+        icon: (x, y, r) => drawMagnetIcon(ctx, x, y + r * 0.1, r) });
+      if (state.timeout > 0) timers.push({ left: state.timeout, full: cfg.timeoutFrames || 300, color: C.chrome,
+        icon: (x, y, r) => drawTimeoutIcon(ctx, x, y, r * 0.55) });
+      if (state.bak > 0) timers.push({ left: state.bak, full: cfg.bakFrames || 600, color: C.gold, label: 'x2',
+        icon: (x, y, r) => drawBakIcon(ctx, x, y + r * 0.1, r * 0.55) });
+      const line = Math.round(small * 1.9);
+      const rows = Math.round(small * 1.5) + Math.round(fs * 1.6) + line +
+        timers.length * line + (state.shield ? line : 0);
       const ballsW = (String(state.balls || 0).length + String(Math.floor(state.dist || 0)).length + 3) * small;
-      const boxW = Math.max(String(score).length * fs, ballsW, (state.magnet > 0 ? small * 9.5 : 0), small * 7) + pad * 0.8;
+      const boxW = Math.max(String(score).length * fs, ballsW, (timers.length ? small * 12 : 0), small * 7) + pad * 0.8;
       ctx.fillStyle = 'rgba(2,19,43,0.55)';
       ctx.fillRect(pad * 0.5, pad * 0.5, boxW, rows + pad * 0.2);
       let y = pad;
@@ -958,24 +1033,23 @@
       hudText(Math.floor(state.dist || 0) + 'm', pad + r * 2 + 6 + wb + small * 1.2, y, small, C.chrome);
       y += Math.round(small * 1.9);
       // power-ups
-      const cfg = (root.TTR_CONFIG && root.TTR_CONFIG.game) || {};
-      if (state.magnet > 0) {
-        const full = cfg.magnetFrames || 360;
-        const frac = clamp(state.magnet / full, 0, 1);
+      for (const t of timers) {
+        const frac = clamp(t.left / t.full, 0, 1);
         const bw = small * 6, bh = Math.max(6, small * 0.6);
-        drawMagnetIcon(ctx, pad + small * 0.5, y + small * 0.55, small * 0.9);
+        t.icon(pad + small * 0.5, y + small * 0.45, small * 0.9);
         const bx = pad + small * 1.4, by = y + (small - bh) / 2;
         ctx.fillStyle = 'rgba(2,19,43,0.7)';
         ctx.fillRect(bx - 1, by - 1, bw + 2, bh + 2);
-        ctx.fillStyle = C.gold;
+        ctx.fillStyle = t.color;
         ctx.fillRect(bx, by, bw * frac, bh);
-        hudText(Math.ceil(state.magnet / 60) + 's', bx + bw + 6, y, small);
-        y += Math.round(small * 1.9);
+        const w = hudText(Math.ceil(t.left / 60) + 's', bx + bw + 6, y, small);
+        if (t.label) hudText(t.label, bx + bw + 6 + w + small * 0.6, y, small, C.gold);
+        y += line;
       }
       if (state.shield) {
         drawBatIcon(ctx, pad + small * 0.5, y + small * 0.4, small * 0.55, -0.5, C.blue);
         hudText('SCHILD', pad + small * 1.4, y, small, C.chrome);
-        y += Math.round(small * 1.9);
+        y += line;
       }
       ctx.restore();
     }
@@ -1037,7 +1111,8 @@
           case 'table': drawTable(it, d0, d1); break;
           case 'net': drawNet(it, (d0 + d1) / 2); break;
           case 'machine': drawMachine(it, d0, d1, frame); break;
-          case 'ball': case 'shield': case 'magnet': drawPickup(it, (d0 + d1) / 2, state); break;
+          case 'ball': case 'shield': case 'magnet': case 'timeout': case 'bak':
+            drawPickup(it, (d0 + d1) / 2, state); break;
           default: break;
         }
       }
@@ -1051,11 +1126,14 @@
       ctx.restore();
     }
 
+    function setSkin(id) { kit = KITS[id] || KITS.club; }
+
     resize();
-    return { resize, draw };
+    return { resize, draw, setSkin };
   }
 
   root.TTR = root.TTR || {};
   root.TTR.createRenderer = createRenderer;
+  root.TTR.KITS = KITS;
   if (typeof module !== 'undefined' && module.exports) module.exports = { createRenderer };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

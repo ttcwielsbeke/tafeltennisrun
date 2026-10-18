@@ -40,8 +40,21 @@
       ballPoints: 10,        // punten per bal
       magnetFrames: 360,     // magneet: 6 seconden
       magnetReach: 9,        // magneet trekt ballen tot zoveel meter voor je
-      shieldGraceFrames: 60  // na een schild-botsing 1 s onkwetsbaar
-    }
+      shieldGraceFrames: 60, // na een schild-botsing 1 s onkwetsbaar
+      timeoutFrames: 300,    // time-out: 5 seconden trager
+      timeoutSlow: 0.6,      // ... aan zoveel keer de gewone snelheid
+      bakFrames: 600         // ballenbak: 10 seconden dubbele punten per bal
+    },
+
+    /* tenues: vrij te spelen met je beste score op dit toestel
+       (daguitdaging en oefenen tellen allebei). Puur voor het oog. */
+    skins: [
+      { id: 'club',      name: 'Clubshirt',     at: 0 },
+      { id: 'trainer',   name: 'Jeugdtrainer',  at: 300 },
+      { id: 'links',     name: 'Linkshandige',  at: 750 },
+      { id: 'groen',     name: 'Groene noppen', at: 1500 },
+      { id: 'kampioen',  name: 'Clubkampioen',  at: 3000 }
+    ]
   };
 
   root.TTR_CONFIG = TTR_CONFIG;

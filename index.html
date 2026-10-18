@@ -31,7 +31,16 @@
         <li><b>Tafel</b> &gt; spring erover</li>
         <li><b>Net of ballenmachine</b> &gt; slide eronder</li>
         <li><b>Ballen</b> = punten &middot; <b class="blue">schild-bat</b> &middot; <b class="gold">magneet</b></li>
+        <li><b class="blue">Time-out</b> = even trager &middot; <b class="gold">ballenbak</b> = dubbele punten</li>
       </ul>
+      <div id="skin-picker" class="skin-picker">
+        <span class="lbl">Tenue</span>
+        <button id="skin-prev" class="icon" type="button" aria-label="Vorig tenue">&lt;</button>
+        <span id="skin-swatch" class="swatch" aria-hidden="true"></span>
+        <span id="skin-name" class="name" aria-live="polite">Clubshirt</span>
+        <button id="skin-next" class="icon" type="button" aria-label="Volgend tenue">&gt;</button>
+      </div>
+      <p class="skin-lock" id="skin-lock"></p>
       <p class="keys">
         <span class="touch">Veeg links, rechts, omhoog of omlaag. Tik = springen.</span>
         <span class="pc">Pijltjes of A/D/W/S &middot; spatie = springen &middot; P = pauze</span>
@@ -55,6 +64,7 @@
       <h2 id="over-title">Gebotst!</h2>
       <p class="final"><span id="over-score">0</span> punten</p>
       <p class="sub" id="over-detail"></p>
+      <p class="unlock" id="unlock-note" hidden></p>
 
       <form id="name-form" hidden>
         <label for="name-input">Je naam voor de ranglijst</label>
@@ -80,6 +90,7 @@
   <script src="rng.js"></script>
   <script src="world.js"></script>
   <script src="game.js"></script>
+  <script src="skins.js"></script>
   <script src="input.js"></script>
   <script src="render.js"></script>
   <script src="board.js"></script>

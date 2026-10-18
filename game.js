@@ -30,9 +30,9 @@
     const s = {
       seed: String(seed), cfg: c,
       frame: 0, alive: true, crashedBy: null,
-      dist: 0, speed: c.startSpeed,
+      dist: 0, speed: c.startSpeed, vel: c.startSpeed,
       lane: 1, x: 1, y: 0, vy: 0, sliding: 0,
-      balls: 0, shield: false, magnet: 0, grace: 0,
+      balls: 0, points: 0, shield: false, magnet: 0, grace: 0, timeout: 0, bak: 0,
       items: [], corners: [], events: [], nextChunk: 0
     };
     fill(s);
@@ -68,9 +68,11 @@
       }
     }
 
-    // vooruit
+    // vooruit; tijdens een time-out trager, de laatste halve seconde weer op snelheid
     s.speed = Math.min(c.maxSpeed, s.speed + c.accel * DT);
-    s.dist += s.speed * DT;
+    const slow = s.timeout > 0 ? 1 - (1 - c.timeoutSlow) * Math.min(1, s.timeout / 30) : 1;
+    s.vel = s.speed * slow;
+    s.dist += s.vel * DT;
 
     // opzij
     const dx = s.lane - s.x, stepX = 1 / c.laneFrames;
@@ -85,6 +87,8 @@
     if (s.sliding > 0 && s.y <= 0) s.sliding--;   // een slide telt pas af op de grond
     if (s.magnet > 0) s.magnet--;
     if (s.grace > 0) s.grace--;
+    if (s.timeout > 0) s.timeout--;
+    if (s.bak > 0) s.bak--;
 
     fill(s);
     collide(s);
@@ -121,17 +125,24 @@
         const high = it.air ? 1.4 : 0.35;
         const hit = inLane && overlapZ && bottom < high + 0.3 && top > high - 0.3;
         const pulled = s.magnet > 0 && it.z + it.len > pz0 && it.z < s.dist + c.magnetReach;
-        if (hit || pulled) { it.taken = true; s.balls++; s.events.push('ball'); }
+        if (hit || pulled) {
+          it.taken = true; s.balls++;
+          s.points += c.ballPoints * (s.bak > 0 ? 2 : 1);
+          s.events.push('ball');
+        }
       } else if (inLane && overlapZ && bottom < 1.2) {
         it.taken = true;
-        if (it.type === 'shield') { s.shield = true; s.events.push('shield'); }
-        else if (it.type === 'magnet') { s.magnet = c.magnetFrames; s.events.push('magnet'); }
+        if (it.type === 'shield') s.shield = true;
+        else if (it.type === 'magnet') s.magnet = c.magnetFrames;
+        else if (it.type === 'timeout') s.timeout = c.timeoutFrames;
+        else if (it.type === 'bak') s.bak = c.bakFrames;
+        s.events.push(it.type);
       }
     }
   }
 
   function scoreOf(s) {
-    return Math.floor(s.dist) + s.balls * s.cfg.ballPoints;
+    return Math.floor(s.dist) + s.points;
   }
 
   // vaste-stap-lus: app.js geeft de tijd van requestAnimationFrame door

@@ -116,6 +116,27 @@ h3{ font-size:10px; font-weight:400; margin:14px 0 8px; color:var(--chrome); }
   .keys .pc{ display:inline; }
 }
 
+/* tenuekiezer */
+.skin-picker{
+  display:flex; align-items:center; justify-content:center; gap:8px;
+  font-size:9px; margin-bottom:4px;
+}
+.skin-picker .lbl{ color:var(--chrome); }
+.skin-picker .icon{ width:34px; height:34px; font-size:12px; font-family:var(--px); }
+.skin-picker .swatch{
+  width:22px; height:26px; flex:0 0 auto;
+  border-radius:4px; box-shadow:0 0 0 2px var(--ink), 0 0 0 3px rgba(255,255,255,.6);
+}
+.skin-picker .name{ min-width:13ch; color:#fff; }
+.skin-picker.locked .swatch{ filter:grayscale(1) brightness(.55); }
+.skin-picker.locked .name{ color:#8aa6c8; }
+.skin-lock{ font-size:8px; color:var(--gold); min-height:12px; margin-bottom:6px; }
+.unlock{
+  font-size:9px; line-height:1.6; color:var(--ink); background:var(--gold);
+  border-radius:8px; padding:8px; margin:8px 0;
+}
+.unlock[hidden]{ display:none; }
+
 .big{
   display:block; width:100%;
   padding:14px;

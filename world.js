@@ -10,7 +10,7 @@
   const CHUNK_LEN = 120;      // meter per stuk baan
   const MIN_ROW_GAP = 18;     // twee baanwissels of een volle sprong bij topsnelheid
   const START_FREE = 40;      // de eerste 40 m is leeg: even op gang komen
-  const LEN = { nopper: 0.6, table: 1.5, net: 0.2, machine: 0.8, ball: 0.3, shield: 0.5, magnet: 0.5 };
+  const LEN = { nopper: 0.6, table: 1.5, net: 0.2, machine: 0.8, ball: 0.3, shield: 0.5, magnet: 0.5, timeout: 0.5, bak: 0.5 };
 
   const lerp = (a, b, t) => a + (b - a) * t;
   const round1 = (v) => Math.round(v * 10) / 10;
@@ -136,9 +136,10 @@
 
       // af en toe een power-up, midden tussen twee rijen, in een andere baan dan de ballen
       const p = rng.next();
-      if (p < 0.16 && index > 0) {
+      if (p < 0.2 && index > 0) {
         const lane = (ballLane + 1 + rng.int(2)) % 3;
-        add({ type: p < 0.08 ? 'shield' : 'magnet', lane, z: round1(rowZ + gap / 2), len: LEN.shield });
+        const type = p < 0.055 ? 'shield' : p < 0.11 ? 'magnet' : p < 0.155 ? 'timeout' : 'bak';
+        add({ type, lane, z: round1(rowZ + gap / 2), len: LEN[type] });
       }
 
       z += gap;

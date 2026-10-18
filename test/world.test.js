@@ -20,7 +20,7 @@ test('andere seed geeft een andere baan', () => {
 });
 
 test('items blijven netjes: geldige baan, type en volgorde', () => {
-  const types = new Set(['nopper', 'table', 'net', 'machine', 'ball', 'shield', 'magnet']);
+  const types = new Set(['nopper', 'table', 'net', 'machine', 'ball', 'shield', 'magnet', 'timeout', 'bak']);
   for (const seed of SEEDS) {
     for (let i = 0; i < CHUNKS; i++) {
       const items = W.generateChunk(seed, i);

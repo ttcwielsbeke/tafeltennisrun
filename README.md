@@ -23,6 +23,10 @@ Open `index.html` of speel online (GitHub Pages, zie onder).
 - **Tafel** → spring erover. **Net** of **ballenmachine** → slide eronderdoor.
 - **Balletje** = 10 punten, elke meter = 1 punt.
 - **Schild-bat** (blauw): je overleeft één botsing. **Magneet** (goud): 6 seconden lang komen de ballen naar jou.
+- **Time-out** (wit T-kaartje): 5 seconden trager lopen. **Ballenbak** (blauwe bak): 10 seconden dubbele punten per bal.
+- **Tenues**: met je beste score op dit toestel speel je nieuwe tenues vrij (Jeugdtrainer 300, Linkshandige 750,
+  Groene noppen 1500, Clubkampioen 3000; dag- en oefenrondes tellen allebei). Kiezen doe je op het titelscherm
+  met de pijltjes (of ←/→). Puur voor het oog: geen voordeel in het spel. De drempels staan in `config.js`.
 - De snelheid loopt langzaam op. Na een botsing: één tik op **Opnieuw**.
 - **Oefenen** gebruikt een willekeurige baan en telt niet mee voor de ranglijst.
 - Geluid staat standaard uit (knop rechtsboven).
@@ -50,7 +54,8 @@ node --test
 
 - `test/rng.test.js`: zelfde seed geeft dezelfde reeks, de dagseed.
 - `test/world.test.js`: zelfde seed geeft dezelfde baan en bochten, elke rij en elke bocht heeft een veilige route, rijen liggen ver genoeg uit elkaar.
-- `test/game.test.js`: een vaste seed met een vast invoerscript en een autopiloot (`test/bot.js`) geven altijd dezelfde score; schild, magneet, besturing en de vaste-stap-lus.
+- `test/game.test.js`: een vaste seed met een vast invoerscript en een autopiloot (`test/bot.js`) geven altijd dezelfde score; schild, magneet, time-out, ballenbak, besturing en de vaste-stap-lus.
+- `test/skins.test.js`: welke tenues bij welke beste score horen, en dat elk tenue een tekening heeft.
 
 Pas je `config.js` of `world.js` aan, dan veranderen de "gouden" scores in `test/game.test.js`. Dat is de bedoeling: bereken ze opnieuw en pas ze bewust aan.
 
@@ -128,6 +133,7 @@ Het lege bestand `.nojekyll` zorgt dat GitHub de bestanden ongewijzigd serveert.
 | `rng.js` | seedbare random generator en de dagseed |
 | `world.js` | de baan uit de seed: obstakels, ballen, power-ups, bochten |
 | `game.js` | de simulatie met vaste stap van 1/60 s |
+| `skins.js` | welke tenues je met je beste score vrijspeelt |
 | `input.js` | vegen, tikken en toetsen → `left` `right` `jump` `slide` `pause` |
 | `render.js` | tekent de hal, de speler, de obstakels en de HUD |
 | `board.js` | ranglijst: Supabase, met `localStorage` als vangnet |
@@ -141,7 +147,7 @@ Het lege bestand `.nojekyll` zorgt dat GitHub de bestanden ongewijzigd serveert.
 Geen build, geen framework, geen npm. Elk script hangt zijn deel aan één globale namespace
 `TTR` (in de browser `window.TTR`, in Node `globalThis.TTR`) en exporteert het ook via
 `module.exports`, zodat de tests het met `require()` kunnen laden. Volgorde in `index.html`:
-`config.js`, `rng.js`, `world.js`, `game.js`, `input.js`, `render.js`, `board.js`, `app.js`.
+`config.js`, `rng.js`, `world.js`, `game.js`, `skins.js`, `input.js`, `render.js`, `board.js`, `app.js`.
 
 ### Contract tussen de modules
 
@@ -153,7 +159,9 @@ Eenheden: afstand in meter, tijd in frames van 1/60 s. Banen zijn `0` (links), `
 TTR_CONFIG = {
   board: { provider: 'supabase' | 'local', url, key, table: 'runner_scores', limit: 25 },
   game:  { startSpeed, maxSpeed, accel, jumpVel, gravity, slideFrames, laneFrames,
-           ballPoints, magnetFrames, magnetReach, shieldGraceFrames, ... }
+           ballPoints, magnetFrames, magnetReach, shieldGraceFrames,
+           timeoutFrames, timeoutSlow, bakFrames },
+  skins: [{ id, name, at }]   // tenues en de beste score waarmee je ze vrijspeelt
 }
 ```
 
@@ -171,7 +179,7 @@ TTR_CONFIG = {
   - obstakels: `type` ∈ `'nopper'` (wissel van baan), `'table'` (springen), `'net'` (sliden),
     `'machine'` (hangende ballenmachine, sliden). Een tafel of net over meerdere banen is
     één item per baan met dezelfde `row`.
-  - verzamelbaar: `'ball'`, `'shield'`, `'magnet'`; optioneel `air: true` (hangt boven een tafel).
+  - verzamelbaar: `'ball'`, `'shield'`, `'magnet'`, `'timeout'`, `'bak'`; optioneel `air: true` (hangt boven een tafel).
   - obstakels hebben ook `row: string` (id van de rij).
 - `TTR.rowsOf(items) → Row[]` met `Row = { row, z, lanes: [type|null, type|null, type|null] }`.
 - `TTR.isRowSafe(row) → bool` — minstens één baan zonder `nopper`.
@@ -186,15 +194,16 @@ TTR_CONFIG = {
 - `TTR.createGame(seed: string, cfg = TTR_CONFIG.game) → State`
 - `TTR.step(state, actions: string[])` — één frame van 1/60 s. Acties: `'left' | 'right' | 'jump' | 'slide'`.
   (`'pause'` regelt `app.js`, niet de simulatie.)
-- `TTR.scoreOf(state) → int` = `floor(afstand) + ballen × ballPoints`.
+- `TTR.scoreOf(state) → int` = `floor(afstand) + points`; `points` telt `ballPoints` per bal, dubbel tijdens de ballenbak.
 - `TTR.createLoop({ update(), render(alpha) }) → { frame(nowMs), reset() }` — vaste-stap-accumulator;
   `app.js` voedt hem met `requestAnimationFrame`-tijden.
-- `State` (alleen-lezen voor render/app): `{ seed, frame, alive, dist, speed, lane, x, y, sliding,
-  balls, shield, magnet, grace, items, corners, events }`.
+- `State` (alleen-lezen voor render/app): `{ seed, frame, alive, dist, speed, vel, lane, x, y, sliding,
+  balls, points, shield, magnet, grace, timeout, bak, items, corners, events }`.
+  - `speed`: de onderliggende snelheid, `vel`: wat je echt loopt (trager tijdens een time-out).
   - `x`: continue baanpositie (0..2), `y`: hoogte in meter (0 = grond), `sliding`: resterende frames.
   - `items`: de items in het zichtbare venster, met extra `taken` / `broken` vlaggen.
   - `events`: lijst van wat er dit frame gebeurde (`'jump' | 'slide' | 'lane' | 'ball' | 'shield' |
-    'magnet' | 'block' | 'crash'`), voor geluid en effecten. Wordt elke stap geleegd.
+    'magnet' | 'timeout' | 'bak' | 'block' | 'crash'`), voor geluid en effecten. Wordt elke stap geleegd.
 
 **`input.js`**
 - `TTR.createInput(target: HTMLElement, onAction: (action) => void) → { destroy() }`
@@ -202,9 +211,9 @@ TTR_CONFIG = {
 - Telefoon: veeg links/rechts/omhoog/omlaag; een korte tik = springen.
 
 **`render.js`**
-- `TTR.createRenderer(canvas) → { resize(), draw(state) }` — tekent hal (parket, zijlijnen,
+- `TTR.createRenderer(canvas) → { resize(), draw(state), setSkin(id) }`; `TTR.KITS` = de tenues per id — tekent hal (parket, zijlijnen,
   tafels in de verte, scorebord), speler met bat, noppenspelers, tafels, netten, ballen,
-  schild, magneet en de HUD (score, ballen, power-uptijd). Past zich aan de canvasgrootte aan.
+  schild, magneet, time-out, ballenbak en de HUD (score, ballen, een balk per lopende power-up). Past zich aan de canvasgrootte aan.
   Bochten: vloer, lijnen en items schuiven opzij volgens `curveAt` (twee keer geïntegreerd vanaf
   de speler), de achtergrond schuift mee met `headingAt`.
 
