@@ -123,14 +123,16 @@ toestelgeheim, past de tempolimiet toe en bewaart de run. Eenmalig installeren:
 3. Zet de functie online en vertel ze vanaf welke site het spel draait:
 
    ```sh
-   supabase functions deploy submit-run
+   supabase functions deploy submit-run --no-verify-jwt
    supabase secrets set ALLOWED_ORIGIN=https://boermansjo.github.io
    ```
 
    `ALLOWED_ORIGIN` mag een komma-gescheiden lijst zijn. `http://localhost:<poort>` en
    `http://127.0.0.1:<poort>` mogen altijd, om lokaal te testen. `supabase/config.toml` (gemaakt met
-   `supabase init`) zet voor deze functie `verify_jwt = true`: zonder de publieke anon-sleutel als
-   `Authorization: Bearer` weigert Supabase het verzoek al voor de functie draait.
+   `supabase init`) zet voor deze functie al `verify_jwt = false`; de vlag `--no-verify-jwt` maakt
+   dat enkel expliciet. Supabase controleert dus geen JWT aan de poort: de publieke sleutel
+   (`sb_publishable_…` in `config.js`) is geen JWT. De functie beschermt zichzelf door elke run
+   opnieuw af te spelen en de naam aan het toestelgeheim te koppelen.
 
 4. Controleer met drie `curl`-verzoeken. Speel eerst een **dagrun** in de browser en kopieer daarna in
    de console van de ontwikkelaarstools de run naar het klembord:
@@ -140,13 +142,13 @@ toestelgeheim, past de tempolimiet toe en bewaart de run. Eenmalig installeren:
    ```
 
    (`TTR.debug.lastRun` bestaat zodra het spel de runs naar de functie stuurt.) Plak dat in een bestand
-   `run.json`. Vervang `<anon key>` hieronder door de publieke sleutel; in PowerShell typ je `curl.exe`
-   in plaats van `curl`.
+   `run.json`. Vervang `<publishable key>` hieronder door de publieke sleutel uit `config.js` (net
+   wat het spel meestuurt); in PowerShell typ je `curl.exe` in plaats van `curl`.
 
    - **Echte run** → `{"ok":true,"score":…,"personalBest":…,"todayBest":…,"newBest":…}`:
 
      ```sh
-     curl -H "Authorization: Bearer <anon key>" -H "Content-Type: application/json" --data @run.json https://aqaikstibteqcdgxtuiw.supabase.co/functions/v1/submit-run
+     curl -H "apikey: <publishable key>" -H "Content-Type: application/json" --data @run.json https://aqaikstibteqcdgxtuiw.supabase.co/functions/v1/submit-run
      ```
 
    - **Vervalste run**: kopieer `run.json` naar `run-vals.json` en tel 30 op bij `frames`. Dezelfde
@@ -158,10 +160,6 @@ toestelgeheim, past de tempolimiet toe en bewaart de run. Eenmalig installeren:
    De run van de eerste controle staat daarna echt in de ranglijst (het is een gewone run).
    Stuur je dezelfde run binnen een paar seconden opnieuw, dan krijg je `429` (`"code":"rate"`).
    Een run van eergisteren of ouder geeft `400` (`"code":"date"`): enkel vandaag en gisteren tellen.
-
-   Krijg je `401` met "Invalid JWT"? De nieuwe sleutels die beginnen met `sb_publishable_` zijn geen
-   JWT. Gebruik dan de oude anon-sleutel (begint met `eyJ`, onder **Project Settings → API Keys →
-   Legacy API Keys**).
 
 ### Moderatie
 

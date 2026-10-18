@@ -387,9 +387,9 @@ deno_version = 2
 # secret_key = "env(SECRET_VALUE)"
 
 # Tafeltennisrun: de functie die een dagrun nakijkt en bewaart.
-# Het spel stuurt de publieke anon-sleutel mee als `Authorization: Bearer`.
+# Geen JWT-controle: de publieke sleutel (sb_publishable_…) is geen JWT; de herberekening en het toestelgeheim beschermen de functie.
 [functions.submit-run]
-verify_jwt = true
+verify_jwt = false
 
 [analytics]
 enabled = true
