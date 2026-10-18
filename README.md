@@ -70,58 +70,47 @@ Pas je `config.js` of `world.js` aan, dan veranderen de "gouden" scores in `test
 
 ## Clubranking aanzetten (Supabase)
 
-De ranglijst gebruikt hetzelfde Supabase-project als PIPS OUT!, met een eigen tabel `runner_scores`.
+De ranglijst gebruikt hetzelfde Supabase-project als PIPS OUT!, met eigen tabellen
+(`players`, `runs`, `best_inputs`, `player_secrets`) en twee views (`daily_best`, `alltime_best`).
+Het publiek mag alleen lezen. Schrijven kan enkel een Supabase Edge Function met de service-rol.
 
 1. Open het Supabase-project en ga naar **SQL Editor**.
-2. Plak de inhoud van [`supabase/runner_scores.sql`](supabase/runner_scores.sql) en klik op **Run**.
+2. Plak de inhoud van [`supabase/runner_v2.sql`](supabase/runner_v2.sql) en klik op **Run**.
    Je mag het gerust opnieuw draaien, er gaat niets stuk.
-3. Klaar: de url en de publieke key staan al in `config.js`.
+3. Controleer de rechten. Plak dit in de SQL Editor en voer de regels **één voor één** uit
+   (de eerste twee moeten een foutmelding geven, de derde moet rijen of een lege lijst teruggeven):
 
-Zolang de tabel niet bestaat, of als Supabase even niet antwoordt, valt het spel stil terug op
+   ```sql
+   set role anon;
+
+   -- moet mislukken: "permission denied" of "row-level security"
+   insert into runs (player_id, seed, game_version, score, dist, balls, jumps, slides, lanes,
+                     shields, magnets, timeouts, bakken, blocks, crash, frames, kit)
+   values (gen_random_uuid(), '2026-01-01', 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 'table', 60, 'x');
+
+   -- moet mislukken: "permission denied for table player_secrets"
+   select * from player_secrets;
+
+   -- moet werken
+   select * from daily_best limit 5;
+
+   reset role;
+   ```
+
+4. Klaar: de url en de publieke key staan al in `config.js`.
+
+Zolang de tabellen niet bestaan, of als Supabase even niet antwoordt, valt het spel stil terug op
 een lijst op het eigen toestel. Elke score wordt ook altijd lokaal bewaard. Laat je `url` of `key`
 leeg (of zet `provider: 'local'`), dan blijft alles lokaal.
 
-<details>
-<summary>De SQL (zelfde als in <code>supabase/runner_scores.sql</code>)</summary>
+De database weigert ook zelf onmogelijke runs: namen langer dan 16 tekens, een score hoger dan
+afstand plus ballen kan opleveren, of een afstand die in die tijd niet te lopen is.
 
-```sql
--- ============================================================
--- Tafeltennisrun — ranglijst voor heel de club
--- Plak dit hele bestand in Supabase -> SQL Editor -> Run.
--- Je mag het gerust opnieuw draaien, er gaat niets stuk.
--- ============================================================
+### Moderatie
 
-create table if not exists public.runner_scores (
-  id         uuid primary key default gen_random_uuid(),
-  name       text not null check (char_length(name) between 1 and 16),
-  score      int  not null check (score between 0 and 1000000),
-  seed       text not null check (char_length(seed) between 1 and 32),
-  created_at timestamptz not null default now()
-);
-
-create index if not exists runner_scores_seed_score_idx
-  on public.runner_scores (seed, score desc);
-create index if not exists runner_scores_score_idx
-  on public.runner_scores (score desc);
-
--- Iedereen mag lezen en toevoegen; wijzigen of wissen mag niet.
-alter table public.runner_scores enable row level security;
-
-drop policy if exists "runner_scores lezen" on public.runner_scores;
-create policy "runner_scores lezen" on public.runner_scores
-  for select to anon, authenticated using (true);
-
-drop policy if exists "runner_scores toevoegen" on public.runner_scores;
-create policy "runner_scores toevoegen" on public.runner_scores
-  for insert to anon, authenticated with check (true);
-
-grant select, insert on public.runner_scores to anon, authenticated;
-```
-
-</details>
-
-Iedereen mag lezen en toevoegen, niemand mag wijzigen of wissen. De database weigert namen langer
-dan 16 tekens en scores buiten 0 – 1 000 000.
+Valt er een score of speler op die er niet hoort te staan? Open in Supabase de **Table Editor**,
+kies `players` en wis de speler (of kies `runs` en wis alleen die ene run). Door `on delete cascade`
+verdwijnen bij een speler ook alle runs en invoerlijsten, en de views passen zich vanzelf aan.
 
 ## Hosten op GitHub Pages
 
@@ -148,7 +137,8 @@ Het lege bestand `.nojekyll` zorgt dat GitHub de bestanden ongewijzigd serveert.
 | `render.js` | tekent de hal, de speler, de obstakels en de HUD |
 | `board.js` | ranglijst: Supabase, met `localStorage` als vangnet |
 | `app.js` | schermen, knoppen, geluid en de animatielus |
-| `supabase/runner_scores.sql` | de tabel en de rechten |
+| `supabase/runner_v2.sql` | de tabellen, views en rechten van de eerlijke ranglijst |
+| `supabase/runner_scores.sql` | de oude tabel en de rechten |
 | `test/` | de tests (`node --test`) |
 | `docs/superpowers/specs/` | het ontwerp |
 
