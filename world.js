@@ -12,12 +12,46 @@
   const START_FREE = 40;      // de eerste 40 m is leeg: even op gang komen
   const LEN = { nopper: 0.6, table: 1.5, net: 0.2, machine: 0.8, ball: 0.3, shield: 0.5, magnet: 0.5, timeout: 0.5, bak: 0.5 };
 
+  const CFG = (root.TTR_CONFIG && root.TTR_CONFIG.game) ||
+    (typeof require === 'function' ? require('./config.js').game : {});
+  const MIN_ROW_TIME = 0.9;   // seconden tussen twee rijen, minstens: langer dan een sprong (0,82 s)
+
   const lerp = (a, b, t) => a + (b - a) * t;
+  const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
+
+  /* ---------- verwachte snelheid op afstand z ----------
+     De snelheid hangt enkel van de afstand af (een time-out maakt het alleen
+     makkelijker): v² = v0² + 2·a·z, eerst met accel tot cruiseSpeed, dan met
+     lateAccel tot maxSpeed. Math.sqrt is exact afgerond (IEEE 754): overal gelijk. */
+  function speedPhases() {
+    const v0 = CFG.startSpeed, a1 = CFG.accel, vc = CFG.cruiseSpeed, a2 = CFG.lateAccel, vm = CFG.maxSpeed;
+    const z1 = (vc * vc - v0 * v0) / (2 * a1);
+    const z2 = z1 + (vm * vm - vc * vc) / (2 * a2);
+    return { v0, a1, vc, a2, vm, z1, z2 };
+  }
+  function expectedSpeed(z) {
+    const p = speedPhases();
+    if (z <= p.z1) return Math.sqrt(p.v0 * p.v0 + 2 * p.a1 * z);
+    if (z >= p.z2) return p.vm;
+    return Math.sqrt(p.vc * p.vc + 2 * p.a2 * (z - p.z1));
+  }
+  // seconden sinds de start, bij die verwachte snelheid
+  function expectedTime(z) {
+    const p = speedPhases(), v = expectedSpeed(z);
+    if (z <= p.z1) return (v - p.v0) / p.a1;
+    const t1 = (p.vc - p.v0) / p.a1;
+    if (z < p.z2) return t1 + (v - p.vc) / p.a2;
+    return t1 + (p.vm - p.vc) / p.a2 + (z - p.z2) / p.vm;
+  }
+  // 'laat' = 0 tot 3 minuten, dan oplopend tot 1 na 6 minuten: drukker, moeilijkere patronen, combinaties
+  function lateness(z) { return clamp01((expectedTime(z) - 180) / 180); }
+  // minimale afstand tussen rijen bij snelheid v (+0,15 m: afronding van z op 0,1 m)
+  function minGap(v) { return Math.max(MIN_ROW_GAP, v * MIN_ROW_TIME + 0.15); }
   const round1 = (v) => Math.round(v * 10) / 10;
 
   // Rij-patronen: [type baan 0, baan 1, baan 2], null = vrij.
   // 'min' = vanaf welke moeilijkheid (0..1) het patroon mag komen.
-  function rowPattern(rng, d) {
+  function rowPattern(rng, d, late) {
     const L = rng.int(3);
     const others = [0, 1, 2].filter((l) => l !== L);
     const lanes = [null, null, null];
@@ -35,6 +69,8 @@
           if (lanes.every((t) => t === 'nopper')) lanes[L] = rng.pick(['table', 'net', null]);
         } }
     ].filter((o) => d >= o.min);
+    // later: minder losse noppenspelers, meer gemengde rijen
+    if (late > 0) for (const o of options) o.w *= o.min >= 0.2 ? 1 + 4 * late : o.min === 0 && o.w === 4 ? 1 - 0.6 * late : 1;
     let total = 0;
     for (const o of options) total += o.w;
     let r = rng.next() * total;
@@ -100,11 +136,17 @@
     const add = (it) => { it.id = index + '-' + (n++); items.push(it); return it; };
 
     // rijen op minstens MIN_ROW_GAP van elkaar, ook over de grens tussen twee stukken
-    let z = start + (index === 0 ? START_FREE : MIN_ROW_GAP / 2) + rng.next() * 6;
-    while (z <= end - MIN_ROW_GAP / 2) {
+    // aan elke stukgrens telt de helft van de minimale afstand bij de snelheid daar
+    let z = start + (index === 0 ? START_FREE : minGap(expectedSpeed(start)) / 2) + rng.next() * 6;
+    const endHalf = minGap(expectedSpeed(end)) / 2;
+    let forced = null;                           // tweede rij van een combinatie
+    while (z <= end - endHalf) {
       const rowZ = round1(z);
       const row = index + ':' + rowZ;
-      const lanes = rowPattern(rng, d);
+      const v = expectedSpeed(rowZ), late = lateness(rowZ);
+      const lanes = forced ? [forced, forced, forced] : rowPattern(rng, d, late);
+      const wasForced = !!forced;
+      forced = null;
       // in een bocht hoogstens één noppenspeler: twee veilige banen, de bocht leest al moeilijk genoeg
       if (inCorner(corners, rowZ)) {
         let seen = 0;
@@ -114,7 +156,17 @@
         if (type) add({ type, lane, z: rowZ, len: LEN[type], row });
       });
 
-      const gap = Math.max(MIN_ROW_GAP, lerp(30, 19, d) + rng.next() * lerp(14, 6, d));
+      // afstand tot de volgende rij: eerst in meter zoals altijd, later in tijd bij de verwachte snelheid
+      const r = rng.next();
+      let gap = Math.max(MIN_ROW_GAP, lerp(30, 19, d) + r * lerp(14, 6, d));
+      if (late > 0) gap = v * lerp(1.0, 0.82, late) * (0.85 + 0.3 * r);
+      // combinatie: springen en meteen sliden (of omgekeerd), op de kortste veilige afstand
+      const full = lanes[0] === lanes[1] && lanes[1] === lanes[2] && (lanes[0] === 'table' || lanes[0] === 'net');
+      if (late > 0 && full && !wasForced && rng.chance(0.15 + 0.6 * late)) {
+        forced = lanes[0] === 'table' ? 'net' : 'table';
+        gap = 0;
+      }
+      gap = Math.max(gap, minGap(v));
 
       // een bal boven een tafel, voor wie durft te springen
       const tableLane = lanes.indexOf('table');
@@ -174,10 +226,12 @@
   TTR.MIN_ROW_GAP = MIN_ROW_GAP;
   TTR.ITEM_LEN = LEN;
   TTR.generateChunk = generateChunk;
+  TTR.expectedSpeed = expectedSpeed;
+  TTR.expectedTime = expectedTime;
   TTR.rowsOf = rowsOf;
   TTR.isRowSafe = isRowSafe;
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { CHUNK_LEN, MIN_ROW_GAP, ITEM_LEN: LEN, generateChunk, rowsOf, isRowSafe,
-      cornersOf, curveAt, headingAt, inCorner };
+    module.exports = { CHUNK_LEN, MIN_ROW_GAP, MIN_ROW_TIME, ITEM_LEN: LEN, generateChunk, rowsOf, isRowSafe,
+      cornersOf, curveAt, headingAt, inCorner, expectedSpeed, expectedTime };
   }
 })(typeof globalThis !== 'undefined' ? globalThis : this);

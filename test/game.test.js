@@ -41,6 +41,15 @@ test('een goede speler overleeft: de autopiloot haalt 3 minuten op 5 seeds', () 
   }
 });
 
+test('na 3 minuten versnelt het spel trager door, tot 30 m/s', () => {
+  const s = G.createGame('x');
+  s.items = []; s.nextChunk = 1e9;
+  const at = (sec) => { while (s.frame < sec * 60) G.step(s, []); return s.speed; };
+  assert.ok(Math.abs(at(171.4) - 22) < 0.05);
+  assert.ok(at(300) > 25 && at(300) < 26.5);
+  assert.equal(at(700), 30);
+});
+
 test('niets doen eindigt snel, maar niet meteen (eerste 40 m vrij)', () => {
   const s = G.createGame('2026-10-11');
   while (s.alive && s.frame < 60 * 60) G.step(s, []);

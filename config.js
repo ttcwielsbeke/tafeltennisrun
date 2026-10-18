@@ -27,8 +27,10 @@
     game: {
       /* snelheid in meter per seconde */
       startSpeed: 10,
-      maxSpeed: 22,
-      accel: 0.07,           // m/s erbij per seconde lopen
+      accel: 0.07,           // m/s erbij per seconde lopen, tot cruiseSpeed (~3 min)
+      cruiseSpeed: 22,
+      lateAccel: 0.025,      // daarna trager verder versnellen ...
+      maxSpeed: 30,          // ... tot hier (~8 min). Onder de 40 m/s van de ranglijst-check blijven!
 
       /* springen en sliden */
       jumpVel: 9,            // m/s omhoog bij de sprong (0,8 s in de lucht)

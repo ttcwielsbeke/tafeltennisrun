@@ -5,7 +5,8 @@ const W = require('../world.js');
 const { SPAN } = require('../game.js');
 
 const SEEDS = ['2026-10-11', '2026-10-12', '2027-01-01', 'oefen-abc', 'x'];
-const CHUNKS = 30;   // 3,6 km: ruim voorbij het moeilijkste punt
+const CHUNKS = 30;   // 3,6 km: voorbij het einde van de eerste versnelling
+const LATE = 100;    // 12 km: voorbij de topsnelheid
 
 test('zelfde seed en stuk geven identieke items', () => {
   for (const seed of SEEDS) {
@@ -151,4 +152,69 @@ test('kromming en draaiing kloppen: na de bocht is de hal precies angle gedraaid
   let h = 0;
   for (let z = 100; z < 150; z += 0.01) h += W.curveAt(c, z) * 0.01;
   assert.ok(Math.abs(h - 0.5) < 1e-3);
+});
+
+/* ---------- moeilijkheid die blijft stijgen ---------- */
+
+test('verwachte snelheid: 10 m/s bij de start, 22 na ~2,7 km, nooit boven 30', () => {
+  assert.equal(W.expectedSpeed(0), 10);
+  assert.ok(Math.abs(W.expectedSpeed(2743) - 22) < 0.05);
+  assert.ok(W.expectedSpeed(6000) > 22 && W.expectedSpeed(6000) < 30);
+  assert.equal(W.expectedSpeed(20000), 30);
+  for (let z = 0; z < 15000; z += 250) assert.ok(W.expectedSpeed(z + 250) >= W.expectedSpeed(z));
+});
+
+test('tussen twee rijen zit altijd minstens 0,9 s, ook bij topsnelheid', () => {
+  for (const seed of SEEDS) {
+    const rows = [];
+    for (let i = 0; i < LATE; i++) rows.push(...W.rowsOf(W.generateChunk(seed, i)));
+    for (let k = 1; k < rows.length; k++) {
+      const dt = (rows[k].z - rows[k - 1].z) / W.expectedSpeed(rows[k - 1].z);
+      assert.ok(dt >= 0.9 - 1e-9, seed + ' bij z=' + rows[k].z + ': ' + dt.toFixed(3) + ' s');
+    }
+  }
+});
+
+test('later wordt het drukker: kortere tijd tussen rijen en combinatierijen', () => {
+  const meanDt = (seed, from, to) => {
+    const rows = [];
+    for (let i = from; i < to; i++) rows.push(...W.rowsOf(W.generateChunk(seed, i)));
+    let sum = 0;
+    for (let k = 1; k < rows.length; k++) sum += (rows[k].z - rows[k - 1].z) / W.expectedSpeed(rows[k - 1].z);
+    return sum / (rows.length - 1);
+  };
+  for (const seed of SEEDS) {
+    assert.ok(meanDt(seed, 1, 6) > 1.8, seed + ' begin te druk');
+    assert.ok(meanDt(seed, 60, 90) < 1.1, seed + ' einde niet druk genoeg');
+  }
+  let combos = 0;
+  for (const seed of SEEDS) {
+    const rows = [];
+    for (let i = 30; i < LATE; i++) rows.push(...W.rowsOf(W.generateChunk(seed, i)));
+    for (let k = 1; k < rows.length; k++) {
+      const a = rows[k - 1].lanes, b = rows[k].lanes;
+      const full = (l, t) => l.every((x) => x === t);
+      if ((full(a, 'table') && full(b, 'net')) || (full(a, 'net') && full(b, 'table'))) combos++;
+    }
+  }
+  assert.ok(combos >= 10, 'te weinig combinatierijen: ' + combos);
+});
+
+// Een bot met vaste reactietijd maakt op een eerlijke baan nooit een fout, hoe snel ook:
+// "hoe lang overleeft een mens" kunnen we niet eerlijk testen. Wel meetbaar: het spel wordt
+// sneller, rijen komen vlugger na elkaar, en de rijen worden gemengder.
+test('na 6 minuten: sneller, rijen dicht op elkaar en vaker gemengd dan na 2 minuten', () => {
+  const stats = (seed, z0, z1) => {
+    const rows = [];
+    for (let i = Math.floor(z0 / W.CHUNK_LEN); i <= Math.ceil(z1 / W.CHUNK_LEN); i++) rows.push(...W.rowsOf(W.generateChunk(seed, i)));
+    const inRange = rows.filter((r) => r.z >= z0 && r.z < z1);
+    const mixed = inRange.filter((r) => new Set(r.lanes.filter(Boolean)).size > 1).length / inRange.length;
+    return { mixed, perSecond: inRange.length / ((z1 - z0) / W.expectedSpeed((z0 + z1) / 2)) };
+  };
+  for (const seed of SEEDS) {
+    const early = stats(seed, 1200, 2400), late = stats(seed, 9000, 12000);
+    assert.ok(W.expectedSpeed(9000) > W.expectedSpeed(2400) * 1.2, 'niet sneller');
+    assert.ok(late.perSecond > early.perSecond * 1.2, seed + ' niet drukker: ' + early.perSecond.toFixed(2) + ' → ' + late.perSecond.toFixed(2));
+    assert.ok(late.mixed > early.mixed + 0.1, seed + ' niet gemengder: ' + early.mixed.toFixed(2) + ' → ' + late.mixed.toFixed(2));
+  }
 });

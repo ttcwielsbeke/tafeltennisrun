@@ -69,7 +69,9 @@
     }
 
     // vooruit; tijdens een time-out trager, de laatste halve seconde weer op snelheid
-    s.speed = Math.min(c.maxSpeed, s.speed + c.accel * DT);
+    // eerst snel op kruissnelheid, daarna blijft het trager versnellen: het wordt nooit 'af'
+    const acc = s.speed < c.cruiseSpeed ? c.accel : c.lateAccel;
+    s.speed = Math.min(c.maxSpeed, s.speed + acc * DT);
     const slow = s.timeout > 0 ? 1 - (1 - c.timeoutSlow) * Math.min(1, s.timeout / 30) : 1;
     s.vel = s.speed * slow;
     s.dist += s.vel * DT;

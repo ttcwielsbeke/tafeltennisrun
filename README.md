@@ -27,7 +27,10 @@ Open `index.html` of speel online (GitHub Pages, zie onder).
 - **Tenues**: met je beste score op dit toestel speel je nieuwe tenues vrij (Jeugdtrainer 300, Linkshandige 750,
   Groene noppen 1500, Clubkampioen 3000; dag- en oefenrondes tellen allebei). Kiezen doe je op het titelscherm
   met de pijltjes (of ←/→). Puur voor het oog: geen voordeel in het spel. De drempels staan in `config.js`.
-- De snelheid loopt langzaam op. Na een botsing: één tik op **Opnieuw**.
+- Het wordt steeds moeilijker, zoals in Subway Surfers: de eerste 3 minuten versnel je van 10 naar 22 m/s, daarna
+  blijft het trager versnellen tot 30 m/s (~8 min). Na 3 minuten komen de rijen vlugger na elkaar, worden ze
+  gemengder, en komen er combinaties (springen en meteen sliden). Tussen twee rijen zit altijd minstens 0,9 s.
+  Na een botsing: één tik op **Opnieuw**.
 - **Oefenen** gebruikt een willekeurige baan en telt niet mee voor de ranglijst.
 - Geluid staat standaard uit (knop rechtsboven); je keuze wordt onthouden. Alles is gesynthetiseerd: sneakerpiep
   bij een slide, een echte "pok" per bal (na elkaar gepakt klimt de toon), het fluitje van de scheidsrechter bij
@@ -165,7 +168,7 @@ Eenheden: afstand in meter, tijd in frames van 1/60 s. Banen zijn `0` (links), `
 ```js
 TTR_CONFIG = {
   board: { provider: 'supabase' | 'local', url, key, table: 'runner_scores', limit: 25 },
-  game:  { startSpeed, maxSpeed, accel, jumpVel, gravity, slideFrames, laneFrames,
+  game:  { startSpeed, accel, cruiseSpeed, lateAccel, maxSpeed, jumpVel, gravity, slideFrames, laneFrames,
            ballPoints, magnetFrames, magnetReach, shieldGraceFrames,
            timeoutFrames, timeoutSlow, bakFrames },
   skins: [{ id, name, at }]   // tenues en de beste score waarmee je ze vrijspeelt
@@ -190,8 +193,10 @@ TTR_CONFIG = {
   - obstakels hebben ook `row: string` (id van de rij).
 - `TTR.rowsOf(items) → Row[]` met `Row = { row, z, lanes: [type|null, type|null, type|null] }`.
 - `TTR.isRowSafe(row) → bool` — minstens één baan zonder `nopper`.
-- `TTR.MIN_ROW_GAP` — minimale afstand tussen twee rijen, groot genoeg om twee keer van baan
-  te wisselen bij topsnelheid.
+- `TTR.MIN_ROW_GAP` (18 m) en `MIN_ROW_TIME` (0,9 s): twee rijen liggen minstens zoveel uit elkaar, de tijd gemeten
+  bij de verwachte snelheid. Ook over de grens tussen twee stukken.
+- `TTR.expectedSpeed(z)` en `TTR.expectedTime(z)` — de snelheid en de tijd sinds de start op afstand `z`, uit
+  `config.js` (`v² = v0² + 2·a·z`, in twee fasen). De baan wordt daarmee na 3 minuten in tijd ingedeeld.
 - Bochten (enkel beeld, de banen blijven banen): `TTR.cornersOf(seed, index) → Corner[]` met
   `Corner = { z, len, dir: -1 | 1, angle }` (radialen), hoogstens één per stuk en volledig erbinnen.
   `TTR.curveAt(corners, z)` geeft de kromming (1/m), `TTR.headingAt(corners, z)` de totale draaiing.
