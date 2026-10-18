@@ -49,14 +49,20 @@
   const PIPS = { shirt: '#c8242a', trim: '#8d1519', hem: '#8d1519', shorts: '#1c2430',
                  pips: ['#f0716a', '#d94a44', '#8b1a1f'], bat: '#c8242a' };
   /* vrij te spelen tenues van de speler (drempels in config.js) */
+  /* Elk tenue verschilt ook van achteren gezien, want zo zie je de speler:
+     naam op de rug, sokken, schoenen, zweetbanden. */
   const KITS = {
-    club:     Object.assign({}, CLUB, { bat: C.red }),
+    club:     Object.assign({}, CLUB, { bat: C.red, backName: 'WIELSBEKE' }),
     trainer:  { shirt: '#0b3a75', trim: '#9ed4ff', hem: '#062a56', shorts: '#111111',
-                stripes: CLUB.stripes, bat: C.red, longSleeves: true },
-    links:    Object.assign({}, CLUB, { bat: C.red, mirror: true }),
-    groen:    Object.assign({}, CLUB, { bat: '#2fa84f', batPips: ['#9cf0a8', '#2fa84f', '#14602a'] }),
+                stripes: CLUB.stripes, bat: C.red, longSleeves: true, backName: 'TRAINER',
+                socks: '#0b3a75' },
+    links:    Object.assign({}, CLUB, { bat: C.red, mirror: true, backName: 'LINKS',
+                headband: C.red, wristband: C.red }),
+    groen:    Object.assign({}, CLUB, { bat: '#2fa84f', batPips: ['#9cf0a8', '#2fa84f', '#14602a'],
+                backName: 'NOPPEN', socks: '#2fa84f', wristband: '#2fa84f' }),
     kampioen: { shirt: '#e0b520', trim: '#fff6c8', hem: '#a88410', shorts: '#111111',
-                stripes: ['#e4474c', '#161616', '#2eb1c2'], bat: C.red }
+                stripes: ['#e4474c', '#161616', '#2eb1c2'], bat: C.red, backName: 'KAMPIOEN',
+                shoes: C.gold, headband: '#161616' }
   };
   const OUTLINE = '#0a1424';   // donkere rand rond figuren
   const HUD_FONT = '"Press Start 2P", monospace';
@@ -1129,25 +1135,50 @@
       g.restore();
     }
 
-    /* speler in het clubshirt van TTC Wielsbeke, van achteren gezien */
+    /* speler in het clubshirt van TTC Wielsbeke, van achteren gezien.
+       Alles in meter, voeten op (0, 0), y omhoog = negatief. De pose volgt
+       uit de state; enkel landen en een bal pakken onthouden we even. */
+    let prevY = 0, landAt = -99, prevBalls = 0, swingAt = -99, prevFrame = -1;
+
+    function groundUnder(state) {
+      // staat er een tafel onder de speler? dan valt de schaduw op het blad
+      const lane = Math.round(state.x == null ? 1 : state.x);
+      const items = state.items || [];
+      for (let i = 0; i < items.length; i++) {
+        const it = items[i];
+        if (it.type !== 'table' || it.broken || it.lane !== lane) continue;
+        if (it.z - 0.2 < state.dist && it.z + it.len + 0.2 > state.dist) return 0.76;
+      }
+      return 0;
+    }
+
     function drawPlayer(state) {
       const d = CAM_BACK;
       const s = f / d;
       const x = (state.x - 1) * LANE_W;
       const y = Math.max(0, state.y || 0);
       const frame = state.frame || 0;
-      const sliding = state.sliding > 0;
+      const sliding = state.sliding > 0 && y <= 0.05;
       const dead = state.alive === false;
 
-      // schaduw
-      const sh = 1 / (1 + y * 0.8);
-      ctx.fillStyle = 'rgba(0,0,0,' + (0.3 * sh).toFixed(3) + ')';
-      ctx.beginPath(); ctx.ellipse(sx(x, d), sy(0, d), 0.38 * s * sh, 0.11 * s * sh, 0, 0, Math.PI * 2); ctx.fill();
+      // korte herinneringen: landen (squash) en een bal pakken (forehand)
+      if (frame < prevFrame) { landAt = -99; swingAt = -99; prevBalls = state.balls || 0; }
+      if (frame !== prevFrame) {
+        if (prevY > 0.05 && y <= 0.05) landAt = frame;
+        if ((state.balls || 0) > prevBalls) swingAt = frame;
+        prevY = y; prevBalls = state.balls || 0; prevFrame = frame;
+      }
+
+      // schaduw: op de vloer, of op het tafelblad als je erover springt
+      const gy = y > 0.7 ? groundUnder(state) : 0;
+      const sh = 1 / (1 + Math.max(0, y - gy) * 0.8);
+      ctx.fillStyle = 'rgba(0,0,0,' + (0.32 * sh).toFixed(3) + ')';
+      ctx.beginPath(); ctx.ellipse(sx(x, d), sy(gy, d), 0.4 * s * sh, 0.12 * s * sh, 0, 0, Math.PI * 2); ctx.fill();
 
       ctx.save();
       ctx.translate(sx(x, d), sy(y, d));
       ctx.scale(s, s);
-      if (!dead && state.grace > 0 && (frame >> 2) & 1) ctx.globalAlpha *= 0.35;
+      if (!dead && state.grace > 0) ctx.globalAlpha *= 0.55 + 0.35 * Math.cos(frame * 0.5);
 
       // aura's
       if (state.magnet > 0) {
@@ -1170,118 +1201,196 @@
       if (dead) {
         ctx.rotate(1.35);
         ctx.translate(0.2, 0.25);
+      } else {
+        // overhellen bij een baanwissel, rond de voeten
+        const dx = clamp((state.lane == null ? state.x : state.lane) - state.x, -1, 1);
+        ctx.rotate(dx * 0.22);
+        // rekken bij het opspringen, squash bij het landen
+        const up = y > 0.05 ? clamp((state.vy || 0) / 9, -1, 1) : 0;
+        const land = Math.max(0, 1 - (frame - landAt) / 8);
+        const st = 1 + 0.1 * Math.max(0, up) - 0.16 * land;
+        ctx.scale(1 / Math.sqrt(st), st);
       }
-      // linkshandige: de hele speler gespiegeld, het logootje blijft op zijn plaats
+      // linkshandige: de hele speler gespiegeld, de tekst op de rug niet
       const mir = kit.mirror ? -1 : 1;
       if (kit.mirror) ctx.scale(-1, 1);
-      const arm = kit.longSleeves ? kit.shirt : C.skin;
+      const armCol = kit.longSleeves ? kit.shirt : C.skin;
+      const swingT = (frame - swingAt) / 12;
+      const flick = swingT >= 0 && swingT < 1 ? Math.sin(swingT * Math.PI) : 0;
 
-      const run = dead ? 0 : Math.sin((state.dist || 0) * 2.4);
       if (sliding && !dead) {
-        // laag en achterover: benen vooruit, romp achterover, armen opzij
-        ctx.fillStyle = kit.shorts;
-        ctx.beginPath(); ctx.ellipse(0, -0.16, 0.3, 0.16, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = arm;
-        ctx.fillRect(-0.48, -0.32, 0.22, 0.08);
-        ctx.fillRect(0.26, -0.32, 0.18, 0.08);
-        sleeveFlat(-0.3, -0.34, -1);
-        sleeveFlat(0.26, -0.34, 1);
-        // romp
-        ctx.fillStyle = kit.shirt;
-        ctx.fillRect(-0.27, -0.46, 0.54, 0.26);
-        ctx.fillStyle = kit.hem;
-        ctx.fillRect(-0.27, -0.23, 0.54, 0.04);
-        for (let i = 0; i < 3; i++) {
-          ctx.fillStyle = kit.stripes[i];
-          ctx.fillRect(-0.27, -0.4 + i * 0.055, 0.54, 0.04);
-        }
-        ctx.fillStyle = kit.trim;
-        ctx.fillRect(-0.12, -0.47, 0.24, 0.035);
-        ctx.fillStyle = C.hair;
-        ctx.beginPath(); ctx.arc(0, -0.55, 0.13, 0, Math.PI * 2); ctx.fill();
-        drawHeldBat(0.5, -0.3, 1.2);
+        // voeten vooruit, romp achterover: laag en breed
+        dust(frame);
+        leg(-0.12, -0.24, -0.16, -0.4, -0.15, -0.5, 1);
+        leg(0.12, -0.24, 0.16, -0.4, 0.15, -0.5, 1);
+        shorts(-0.23, -0.34, 0.46, 0.2);
+        arm(-0.26, -0.58, -0.48, -0.32, -0.6, -0.04, true);       // steunt op de vloer
+        torso(-0.6, 0.42, 0.3, 0.26);
+        armWithBat(0.26, -0.58, 0.5, -0.66, 0.66, -0.84, -1.6 + flick);
+        head(0, -0.74, 0.92);
+      } else if (y > 0.05 && !dead) {
+        // in de lucht: knieën op, armen omhoog
+        const tuck = clamp(y / 0.9, 0, 1);
+        leg(-0.12, -0.86, -0.18, -0.62 - tuck * 0.1, -0.12, -0.36 - tuck * 0.12, 1);
+        leg(0.12, -0.86, 0.18, -0.64 - tuck * 0.1, 0.12, -0.4 - tuck * 0.12, 1);
+        shorts(-0.25, -1.02, 0.5, 0.3);
+        arm(-0.28, -1.42, -0.5, -1.6, -0.56, -1.86, false);
+        torso(-1.5, 0.56, 0.3, 0.25);
+        armWithBat(0.28, -1.42, 0.5, -1.6, 0.58, -1.84, -2.6 + flick);
+        head(0, -1.7, 1);
       } else {
-        const tuck = y > 0.05 && !dead;
-        // benen met witte sokken en schoenen
-        const legL = tuck ? 0.45 : 0.8, liftA = tuck ? 0.25 : Math.max(0, run) * 0.22, liftB = tuck ? 0.15 : Math.max(0, -run) * 0.22;
-        const footA = -0.85 + legL - liftA, footB = -0.85 + legL - liftB;
-        ctx.fillStyle = C.skin;
-        ctx.fillRect(-0.19, -0.85, 0.13, legL - liftA);
-        ctx.fillRect(0.06, -0.85, 0.13, legL - liftB);
-        ctx.fillStyle = C.white;
-        ctx.fillRect(-0.19, footA - 0.12, 0.13, 0.12);
-        ctx.fillRect(0.06, footB - 0.12, 0.13, 0.12);
-        ctx.fillStyle = '#e8e8e8';
-        ctx.fillRect(-0.21, footA - 0.02, 0.17, 0.09);
-        ctx.fillRect(0.04, footB - 0.02, 0.17, 0.09);
-        // short
-        ctx.fillStyle = kit.shorts;
-        ctx.fillRect(-0.25, -1.02, 0.5, 0.3);
-        // linkerarm zwaait (met mouwtje)
-        ctx.save();
-        ctx.translate(-0.3, -1.45);
-        ctx.rotate(tuck ? 2.4 : 0.15 + run * 0.35);
-        ctx.fillStyle = arm;
-        ctx.fillRect(-0.05, 0, 0.1, 0.45);
-        sleeve();
+        // lopen: heupen en schouders draaien tegen elkaar in, het lijf veert
+        const ph = dead ? 0 : (state.dist || 0) * 2.4;
+        const a = Math.sin(ph);
+        const bob = dead ? 0 : 0.05 * Math.abs(a);
+        ctx.translate(0, -bob);
+        const liftL = Math.max(0, a), liftR = Math.max(0, -a);
+        leg(-0.12, -0.86, -0.13, -0.46 - liftL * 0.1, -0.12, -0.06 - liftL * 0.4 + bob, liftL);
+        leg(0.12, -0.86, 0.13, -0.46 - liftR * 0.1, 0.12, -0.06 - liftR * 0.4 + bob, liftR);
+        shorts(-0.25, -1.02, 0.5, 0.3);
+        // de arm die naar voren zwaait, verdwijnt deels achter de romp
+        const fl = a, fr = -a;
+        const elbow = (side, fw) => [side * (0.41 + 0.05 * Math.max(0, -fw)), -1.18 - 0.08 * Math.max(0, -fw)];
+        const hand = (side, fw) => [side * (0.37 - 0.12 * fw), -0.98 - 0.22 * Math.max(0, fw) + 0.06 * Math.max(0, -fw)];
+        const [elx, ely] = elbow(-1, fl), [hlx, hly] = hand(-1, fl);
+        const [erx, ery] = elbow(1, fr), [hrx, hry] = hand(1, fr);
+        const twist = 0.02 * a;
+        if (fl > 0) arm(-0.29, -1.43, elx, ely, hlx, hly, false);
+        if (fr > 0) armWithBat(0.29, -1.43, erx, ery, hrx, hry, 0.5 - fr * 0.4 - flick * 1.8);
+        ctx.save(); ctx.translate(twist, 0);
+        torso(-1.5, 0.56, 0.3, 0.25);
         ctx.restore();
-        // rechterarm met bat
-        ctx.save();
-        ctx.translate(0.3, -1.45);
-        const swing = tuck ? -2.2 : -0.5 - run * 0.25;
-        ctx.rotate(swing);
-        ctx.fillStyle = arm;
-        ctx.fillRect(-0.05, 0, 0.1, 0.42);
-        sleeve();
-        ctx.restore();
-        // shirt: zwart, drie strepen, witte boord, logootje
-        const top = 1.5, h = 0.56, hw = 0.28;
-        ctx.fillStyle = kit.shirt;
-        ctx.fillRect(-hw, -top, hw * 2, h);
-        const th = 0.06, gap = 0.025;
-        for (let i = 0; i < 3; i++) {
-          ctx.fillStyle = kit.stripes[i];
-          ctx.fillRect(-hw, -top + h * 0.34 + i * (th + gap), hw * 2, th);
-        }
-        ctx.fillStyle = kit.trim;
-        ctx.fillRect(-hw * 0.5, -top, hw, 0.045);
-        ctx.beginPath(); ctx.arc(hw * 0.5 * mir, -top + h * 0.17, 0.035, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = kit.hem;
-        ctx.fillRect(-hw, -top + h - 0.05, hw * 2, 0.05);
-        const hx = 0.3 + Math.sin(-swing) * 0.42, hy2 = -1.45 + Math.cos(-swing) * 0.42;
-        drawHeldBat(hx, hy2, -swing * 0.6 + 0.4);
-        // nek + hoofd (achterkant: haar)
-        ctx.fillStyle = C.skin;
-        ctx.fillRect(-0.05, -1.58, 0.1, 0.1);
-        ctx.beginPath(); ctx.arc(0, -1.7, 0.15, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = C.hair;
-        ctx.beginPath(); ctx.arc(0, -1.73, 0.15, Math.PI * 0.95, Math.PI * 2.05); ctx.fill();
-        ctx.fillRect(-0.15, -1.74, 0.3, 0.07);
+        if (fl <= 0) arm(-0.29, -1.43, elx, ely, hlx, hly, false);
+        if (fr <= 0) armWithBat(0.29, -1.43, erx, ery, hrx, hry, 0.5 - fr * 0.4 - flick * 1.8);
+        head(twist * 0.5, -1.7, 1);
       }
       ctx.restore();
 
-      // korte mouw met wit boordje, in het assenstelsel van de arm (arm wijst naar +y)
-      function sleeve() {
-        ctx.fillStyle = kit.shirt;
-        ctx.fillRect(-0.075, -0.03, 0.15, 0.15);
-        ctx.fillStyle = kit.trim;
-        ctx.fillRect(-0.075, 0.12, 0.15, 0.03);
+      // been: heup → knie → voet; lift 0..1 = hiel omhoog, je ziet de zool
+      function leg(hx, hy0, kx, ky, fx, fy, lift) {
+        limb(hx, hy0, kx, ky, 0.15, C.skin);
+        limb(kx, ky, fx, fy - 0.1, 0.12, C.skin);
+        limb(fx, fy - 0.16, fx, fy - 0.05, 0.13, kit.socks || C.white);
+        // schoen van achteren: witte hiel, grijze zool die meer toont als de hiel omhoog gaat
+        ctx.fillStyle = OUTLINE;
+        roundRect(fx - 0.1, fy - 0.07, 0.2, 0.12, 0.04); ctx.fill();
+        ctx.fillStyle = kit.shoes || '#f2f2f2';
+        roundRect(fx - 0.085, fy - 0.06, 0.17, 0.09, 0.03); ctx.fill();
+        ctx.fillStyle = '#9aa3ad';
+        ctx.fillRect(fx - 0.085, fy + 0.015 - lift * 0.03, 0.17, 0.015 + lift * 0.03);
       }
-      // mouw bij een zijwaarts gestrekte arm (dir = -1 links, 1 rechts)
-      function sleeveFlat(ax, ay, dir) {
+      function shorts(x0, y0, w, h) {
+        ctx.fillStyle = kit.shorts;
+        roundRect(x0, y0, w, h, 0.05); ctx.fill();
+        ctx.strokeStyle = OUTLINE; ctx.lineWidth = 0.03; ctx.stroke();
+        ctx.fillStyle = 'rgba(255,255,255,0.1)';
+        ctx.fillRect(x0 + w / 2 - 0.006, y0 + h * 0.35, 0.012, h * 0.65);
+      }
+      // romp: iets breder bij de schouders, strepen erover, naam op de rug
+      function torso(top, h, hwTop, hwBot) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(-hwTop + 0.04, top);
+        ctx.lineTo(hwTop - 0.04, top);
+        ctx.quadraticCurveTo(hwTop, top, hwTop, top + 0.06);
+        ctx.lineTo(hwBot, top + h);
+        ctx.lineTo(-hwBot, top + h);
+        ctx.lineTo(-hwTop, top + 0.06);
+        ctx.quadraticCurveTo(-hwTop, top, -hwTop + 0.04, top);
+        ctx.closePath();
         ctx.fillStyle = kit.shirt;
-        ctx.fillRect(dir < 0 ? ax - 0.06 : ax, ay, 0.12, 0.12);
+        ctx.fill();
+        ctx.strokeStyle = OUTLINE; ctx.lineWidth = 0.03; ctx.stroke();
+        ctx.clip();
+        const th = h * 0.105, gap = h * 0.045;
+        for (let i = 0; i < 3; i++) {
+          ctx.fillStyle = kit.stripes[i];
+          ctx.fillRect(-hwTop, top + h * 0.4 + i * (th + gap), hwTop * 2, th);
+        }
+        // licht van boven, schaduw onderaan
+        ctx.fillStyle = 'rgba(255,255,255,0.07)';
+        ctx.fillRect(-hwTop, top, hwTop * 2, h * 0.18);
+        ctx.fillStyle = 'rgba(0,0,0,0.18)';
+        ctx.fillRect(-hwTop, top + h * 0.88, hwTop * 2, h * 0.12);
+        ctx.fillStyle = kit.hem;
+        ctx.fillRect(-hwTop, top + h - 0.04, hwTop * 2, 0.04);
         ctx.fillStyle = kit.trim;
-        ctx.fillRect(dir < 0 ? ax - 0.06 : ax + 0.09, ay, 0.03, 0.12);
+        ctx.fillRect(-0.12, top, 0.24, 0.04);
+        if (kit.backName && h > 0.4) {
+          ctx.save();
+          ctx.scale(mir * 0.01, 0.01);   // tekst in honderdsten, nooit gespiegeld
+          ctx.font = 'bold 9px system-ui, sans-serif';
+          ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.fillStyle = kit.trim;
+          ctx.fillText(kit.backName, 0, (top + h * 0.24) * 100, 38);
+          ctx.restore();
+        }
+        ctx.restore();
+      }
+      // arm: schouder → elleboog → hand, met een mouwtje
+      function arm(sx0, sy0, ex, ey, hx, hy0, flat) {
+        limb(sx0, sy0, ex, ey, 0.11, armCol);
+        limb(ex, ey, hx, hy0, 0.1, armCol);
+        sleeveOn(sx0, sy0, ex, ey);
+        if (kit.wristband) limb(hx + (ex - hx) * 0.25, hy0 + (ey - hy0) * 0.25, hx + (ex - hx) * 0.1, hy0 + (ey - hy0) * 0.1, 0.12, kit.wristband);
+        ctx.fillStyle = C.skin;
+        ctx.beginPath(); ctx.arc(hx, hy0, flat ? 0.06 : 0.055, 0, Math.PI * 2); ctx.fill();
+      }
+      function armWithBat(sx0, sy0, ex, ey, hx, hy0, rot) {
+        arm(sx0, sy0, ex, ey, hx, hy0, false);
+        drawHeldBat(hx, hy0, rot);
+      }
+      function sleeveOn(x0, y0, x1, y1) {
+        const t = kit.longSleeves ? 0 : 0.42;
+        if (!t) return;
+        const mx = x0 + (x1 - x0) * t, my = y0 + (y1 - y0) * t;
+        limb(x0, y0, mx, my, 0.16, kit.shirt);
+        const tx = x0 + (x1 - x0) * (t - 0.06), ty = y0 + (y1 - y0) * (t - 0.06);
+        ctx.strokeStyle = kit.trim; ctx.lineWidth = 0.16; ctx.lineCap = 'butt';
+        ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(mx, my); ctx.stroke();
+      }
+      // hoofd van achteren: haar, oortjes, nek, eventueel een zweetband
+      function head(hx, hy0, k) {
+        ctx.fillStyle = C.skin;
+        ctx.fillRect(hx - 0.05, hy0 + 0.1 * k, 0.1, 0.1 * k);
+        ctx.fillStyle = OUTLINE;
+        ctx.beginPath(); ctx.arc(hx, hy0, 0.165, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = C.skin;
+        ctx.beginPath(); ctx.arc(hx - 0.15, hy0 + 0.01, 0.04, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(hx + 0.15, hy0 + 0.01, 0.04, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = C.hair;
+        ctx.beginPath(); ctx.arc(hx, hy0, 0.15, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = C.skin;   // nek-haarlijn
+        ctx.beginPath(); ctx.ellipse(hx, hy0 + 0.14, 0.07, 0.035, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 0.025; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.arc(hx, hy0, 0.11, -2.6, -1.6); ctx.stroke();
+        if (kit.headband) {
+          ctx.fillStyle = kit.headband;
+          ctx.beginPath(); ctx.ellipse(hx, hy0 - 0.03, 0.155, 0.04, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillRect(hx - 0.02, hy0 - 0.02, 0.05, 0.14);   // knoop met lintjes
+        }
+      }
+      // stofwolkjes bij een slide, puur uit het frame
+      function dust(fr) {
+        for (let i = 0; i < 6; i++) {
+          const t = (fr * 0.07 + i / 6) % 1;
+          const side = i % 2 ? 1 : -1;
+          ctx.fillStyle = 'rgba(245,225,200,' + (0.45 * (1 - t)).toFixed(3) + ')';
+          ctx.beginPath();
+          ctx.arc(side * (0.3 + t * 0.35), -0.04 - t * 0.2, 0.05 + t * 0.09, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
       function drawHeldBat(bx, by, rot) {
         ctx.save();
         ctx.translate(bx, by);
         ctx.rotate(rot);
+        ctx.fillStyle = OUTLINE;
+        ctx.fillRect(-0.04, -0.03, 0.08, 0.18);
         ctx.fillStyle = '#8a5a2b';
         ctx.fillRect(-0.03, -0.02, 0.06, 0.16);
         ctx.fillStyle = '#111';          // zwarte kant + rand
-        ctx.beginPath(); ctx.ellipse(0, 0.3, 0.15, 0.17, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(0, 0.3, 0.155, 0.175, 0, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = kit.bat;         // rubber naar de camera
         ctx.beginPath(); ctx.ellipse(0.015, 0.3, 0.125, 0.145, 0, 0, Math.PI * 2); ctx.fill();
         if (kit.batPips) {               // lange noppen: een raster bolletjes op het rubber
@@ -1294,6 +1403,9 @@
               ctx.beginPath(); ctx.arc(px, py, 0.016, 0, Math.PI * 2); ctx.fill();
             }
           }
+        } else {
+          ctx.fillStyle = 'rgba(255,255,255,0.18)';
+          ctx.beginPath(); ctx.ellipse(-0.03, 0.24, 0.05, 0.03, -0.6, 0, Math.PI * 2); ctx.fill();
         }
         ctx.restore();
       }
