@@ -807,7 +807,8 @@
       ctx.restore();
     }
 
-    /* noppenspeler in PIPS OUT!-tenue, kijkt naar de speler */
+    /* noppenspeler in PIPS OUT!-tenue, kijkt naar de speler en wacht in
+       klaarstand: door de knieën, wippend op de voorvoeten */
     function drawNopper(item, d, frame) {
       const s = f / d;
       const x = (item.lane - 1) * LANE_W;
@@ -815,68 +816,94 @@
       ctx.translate(sx(x, d), sy(0, d));
       ctx.scale(s, s);
       if (item.broken) { ctx.globalAlpha *= 0.35; ctx.rotate(0.6); }
-      // schaduw
-      ctx.fillStyle = 'rgba(0,0,0,0.25)';
-      ctx.beginPath(); ctx.ellipse(0, 0, 0.4, 0.1, 0, 0, Math.PI * 2); ctx.fill();
-      const sway = Math.sin(frame * 0.12 + item.z) * 0.03;
-      // benen, witte sokken en schoenen
-      ctx.fillStyle = C.skin;
-      ctx.fillRect(-0.2, -0.62, 0.13, 0.6);
-      ctx.fillRect(0.07, -0.62, 0.13, 0.6);
-      ctx.fillStyle = C.white;
-      ctx.fillRect(-0.2, -0.2, 0.13, 0.12);
-      ctx.fillRect(0.07, -0.2, 0.13, 0.12);
-      ctx.fillStyle = '#e8e8e8';
-      ctx.fillRect(-0.22, -0.08, 0.17, 0.08);
-      ctx.fillRect(0.05, -0.08, 0.17, 0.08);
+      shadow(0.42);
+      const seed = item.z * 1.7 + item.lane;
+      const bounce = Math.abs(Math.sin(frame * 0.16 + seed)) * 0.05;
+      const sway = Math.sin(frame * 0.08 + seed) * 0.03;
+      ctx.translate(0, -bounce);
+      // benen in klaarstand: knieën naar buiten
+      for (const side of [-1, 1]) {
+        limb(side * 0.12, -0.84, side * 0.2, -0.45, 0.15, C.skin);
+        limb(side * 0.2, -0.45, side * 0.15, -0.12 + bounce, 0.12, C.skin);
+        limb(side * 0.15, -0.16 + bounce, side * 0.15, -0.06 + bounce, 0.13, C.white);
+        ctx.fillStyle = OUTLINE;
+        roundRect(side * 0.15 - 0.1, -0.08 + bounce, 0.2, 0.11, 0.04); ctx.fill();
+        ctx.fillStyle = '#e8e8e8';
+        roundRect(side * 0.15 - 0.085, -0.07 + bounce, 0.17, 0.08, 0.03); ctx.fill();
+      }
       // short
       ctx.fillStyle = PIPS.shorts;
-      ctx.fillRect(-0.25, -0.95, 0.5, 0.34);
-      // arm links (achter het shirt)
-      ctx.fillStyle = C.skin;
-      ctx.fillRect(-0.38, -1.42, 0.1, 0.45);
-      ctx.fillStyle = PIPS.shirt;
-      ctx.fillRect(-0.39, -1.48, 0.12, 0.14);
-      ctx.fillStyle = PIPS.trim;
-      ctx.fillRect(-0.39, -1.37, 0.12, 0.03);
+      roundRect(-0.26, -1.0, 0.52, 0.3, 0.05); ctx.fill();
+      ctx.strokeStyle = OUTLINE; ctx.lineWidth = 0.03; ctx.stroke();
+      // vrije arm voor het lijf, klaar om te blokken
+      limb(-0.3, -1.42, -0.42, -1.12, 0.11, C.skin);
+      limb(-0.42, -1.12, -0.24, -1.02, 0.1, C.skin);
       // shirt: rood rubber met noppen
-      ctx.fillStyle = PIPS.shirt;
-      ctx.fillRect(-0.28, -1.5, 0.56, 0.6);
-      drawPips(-0.28, -1.5, 0.56, 0.6, 0.075, PIPS.pips, s);
+      ctx.save();
+      roundRect(-0.29, -1.52, 0.58, 0.6, 0.07);
+      ctx.fillStyle = PIPS.shirt; ctx.fill();
+      ctx.strokeStyle = OUTLINE; ctx.lineWidth = 0.03; ctx.stroke();
+      ctx.restore();
+      drawPips(-0.27, -1.5, 0.54, 0.56, 0.075, PIPS.pips, s);
       ctx.fillStyle = PIPS.trim;
-      ctx.fillRect(-0.14, -1.5, 0.28, 0.04);       // boord
-      ctx.fillRect(-0.28, -0.95, 0.56, 0.05);      // zoom
-      // hoofd
-      ctx.fillStyle = C.skin;
-      ctx.beginPath(); ctx.arc(sway, -1.64, 0.15, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#222';
-      ctx.beginPath(); ctx.arc(sway, -1.69, 0.15, Math.PI, Math.PI * 2); ctx.fill();
-      // ogen + boze wenkbrauwen
-      ctx.fillStyle = '#111';
-      ctx.fillRect(sway - 0.07, -1.65, 0.035, 0.035);
-      ctx.fillRect(sway + 0.035, -1.65, 0.035, 0.035);
-      ctx.fillRect(sway - 0.09, -1.69, 0.07, 0.015);
-      ctx.fillRect(sway + 0.02, -1.69, 0.07, 0.015);
-      // grote bat omhoog met noppenrubber
-      ctx.save();
-      ctx.translate(0.33, -1.25);
-      ctx.rotate(0.25 + sway);
-      ctx.fillStyle = C.skin;
-      ctx.fillRect(-0.06, -0.05, 0.1, 0.3);
+      ctx.fillRect(-0.14, -1.52, 0.28, 0.04);       // boord
+      ctx.fillRect(-0.29, -0.97, 0.58, 0.05);       // zoom
+      // mouwen
       ctx.fillStyle = PIPS.shirt;
-      ctx.fillRect(-0.07, 0.13, 0.12, 0.13);
-      ctx.fillStyle = '#8a5a2b';
-      ctx.fillRect(-0.035, -0.22, 0.07, 0.2);
+      roundRect(-0.4, -1.5, 0.14, 0.16, 0.04); ctx.fill();
+      roundRect(0.26, -1.5, 0.14, 0.16, 0.04); ctx.fill();
+      // hoofd
+      const hx = sway;
+      ctx.fillStyle = C.skin;
+      ctx.fillRect(hx - 0.05, -1.6, 0.1, 0.1);
+      ctx.fillStyle = OUTLINE;
+      ctx.beginPath(); ctx.arc(hx, -1.68, 0.165, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = C.skin;
+      ctx.beginPath(); ctx.arc(hx, -1.68, 0.15, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#222';
+      ctx.beginPath(); ctx.arc(hx, -1.72, 0.15, Math.PI, Math.PI * 2); ctx.fill();
+      ctx.fillRect(hx - 0.15, -1.73, 0.3, 0.03);
+      // ogen + boze wenkbrauwen + grimas
       ctx.fillStyle = '#111';
-      ctx.beginPath(); ctx.ellipse(0, -0.46, 0.25, 0.28, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = PIPS.bat;
-      ctx.beginPath(); ctx.ellipse(0, -0.46, 0.225, 0.255, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillRect(hx - 0.075, -1.67, 0.035, 0.04);
+      ctx.fillRect(hx + 0.04, -1.67, 0.035, 0.04);
       ctx.save();
-      ctx.beginPath(); ctx.ellipse(0, -0.46, 0.225, 0.255, 0, 0, Math.PI * 2); ctx.clip();
-      drawPips(-0.23, -0.72, 0.46, 0.52, 0.055, PIPS.pips, s);
+      ctx.translate(hx - 0.06, -1.7); ctx.rotate(0.35); ctx.fillRect(-0.045, -0.01, 0.09, 0.02); ctx.restore();
+      ctx.save();
+      ctx.translate(hx + 0.06, -1.7); ctx.rotate(-0.35); ctx.fillRect(-0.045, -0.01, 0.09, 0.02); ctx.restore();
+      ctx.fillRect(hx - 0.04, -1.59, 0.08, 0.015);
+      // batarm omhoog met noppenrubber
+      const lift = Math.sin(frame * 0.08 + seed) * 0.08;
+      limb(0.3, -1.42, 0.44, -1.2, 0.11, C.skin);
+      limb(0.44, -1.2, 0.4, -1.42 - lift, 0.1, C.skin);
+      ctx.save();
+      ctx.translate(0.4, -1.42 - lift);
+      ctx.rotate(0.2 + sway * 2);
+      ctx.fillStyle = OUTLINE;
+      ctx.fillRect(-0.045, -0.24, 0.09, 0.24);
+      ctx.fillStyle = '#8a5a2b';
+      ctx.fillRect(-0.035, -0.23, 0.07, 0.22);
+      ctx.fillStyle = '#111';
+      ctx.beginPath(); ctx.ellipse(0, -0.48, 0.25, 0.28, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = PIPS.bat;
+      ctx.beginPath(); ctx.ellipse(0, -0.48, 0.225, 0.255, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.save();
+      ctx.beginPath(); ctx.ellipse(0, -0.48, 0.225, 0.255, 0, 0, Math.PI * 2); ctx.clip();
+      drawPips(-0.23, -0.74, 0.46, 0.52, 0.055, PIPS.pips, s);
       ctx.restore();
       ctx.restore();
       ctx.restore();
+    }
+
+    /* gevarenstrook op de vloer onder alles waar je onderdoor moet:
+       geel-zwart, dezelfde taal voor het net en de ballenmachine */
+    function hazardStrip(xm, d0, d1) {
+      const hw = LANE_W / 2 - 0.12, n = 6;
+      const a = Math.max(NEAR, d0 - 0.9), b = d1 + 0.3, step = (b - a) / n;
+      for (let i = 0; i < n; i++) {
+        ctx.fillStyle = i % 2 ? 'rgba(17,17,17,0.55)' : 'rgba(255,210,63,0.8)';
+        ctx.beginPath(); quadFloor(xm - hw, xm + hw, a + i * step, a + (i + 1) * step); ctx.fill();
+      }
     }
 
     function drawTable(item, d0, d1) {
@@ -886,7 +913,7 @@
       ctx.save();
       if (item.broken) ctx.globalAlpha *= 0.3;
       // schaduw op de vloer
-      ctx.fillStyle = 'rgba(0,0,0,0.18)';
+      ctx.fillStyle = 'rgba(0,0,0,0.22)';
       ctx.beginPath(); quadFloor(x0 + 0.05, x1 - 0.05, d0 + 0.1, d1 - 0.1); ctx.fill();
       // poten
       const lw = Math.max(1, 0.05 * f / d0);
@@ -905,15 +932,11 @@
       // voorkant
       ctx.fillStyle = C.tableD;
       ctx.fillRect(sx(x0, d0), sy(top, d0), sx(x1, d0) - sx(x0, d0), th * f / d0 + 1);
-      // blad
+      // blad, met een lichtglans naar achteren
       ctx.fillStyle = C.table;
-      ctx.beginPath();
-      ctx.moveTo(sx(x0, d0), sy(top, d0));
-      ctx.lineTo(sx(x1, d0), sy(top, d0));
-      ctx.lineTo(sx(x1, d1), sy(top, d1));
-      ctx.lineTo(sx(x0, d1), sy(top, d1));
-      ctx.closePath();
-      ctx.fill();
+      ctx.beginPath(); quadAt(x0, x1, d0, d1, top); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.08)';
+      ctx.beginPath(); quadAt(x0, x1, d0 + (d1 - d0) * 0.55, d1, top); ctx.fill();
       // witte randen
       const mask = item.row != null ? (tableRows[item.row] || 0) : 0;
       const hasL = item.lane > 0 && (mask & (1 << (item.lane - 1)));
@@ -931,38 +954,58 @@
       ctx.beginPath();
       ctx.moveTo(sx(xm, d0), sy(top, d0)); ctx.lineTo(sx(xm, d1), sy(top, d1));
       ctx.stroke();
+      // netje dwars over het midden: zo is het meteen een tafeltennistafel
+      const dm = (d0 + d1) / 2, nh = 0.15;
+      ctx.fillStyle = 'rgba(20,24,30,0.55)';
+      ctx.beginPath();
+      ctx.moveTo(sx(x0, dm), sy(top, dm)); ctx.lineTo(sx(x1, dm), sy(top, dm));
+      ctx.lineTo(sx(x1, dm), sy(top + nh, dm)); ctx.lineTo(sx(x0, dm), sy(top + nh, dm));
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = Math.max(1, 0.02 * f / dm);
+      ctx.beginPath(); ctx.moveTo(sx(x0, dm), sy(top + nh, dm)); ctx.lineTo(sx(x1, dm), sy(top + nh, dm)); ctx.stroke();
       ctx.restore();
     }
 
+    /* hangend net: aan kabels uit het plafond, met een gat eronder */
     function drawNet(item, d) {
       const s = f / d;
       const xm = (item.lane - 1) * LANE_W;
       ctx.save();
+      if (item.broken) ctx.globalAlpha *= 0.3;
+      if (!item.broken) hazardStrip(xm, d - 0.1, d + 0.1);
+      // schaduw van het net, wat verder op de vloer
+      ctx.fillStyle = 'rgba(0,0,0,0.14)';
+      ctx.beginPath(); quadFloor(xm - LANE_W / 2 + 0.06, xm + LANE_W / 2 - 0.06, d + 0.25, d + 0.6); ctx.fill();
       ctx.translate(sx(xm, d), sy(0, d));
       ctx.scale(s, s);
-      if (item.broken) { ctx.globalAlpha *= 0.3; ctx.rotate(0.2); }
-      const hw = LANE_W / 2 - 0.04, yb = -0.95, yt = -2.4;   // hoog net: eronder, niet erover
-      // palen
-      ctx.fillStyle = '#9aa3ad';
-      ctx.fillRect(-hw - 0.03, yt - 0.04, 0.06, -yt + 0.04);
-      ctx.fillRect(hw - 0.03, yt - 0.04, 0.06, -yt + 0.04);
-      ctx.fillStyle = '#4a525c';
-      ctx.fillRect(-hw - 0.07, -0.04, 0.14, 0.04);
-      ctx.fillRect(hw - 0.07, -0.04, 0.14, 0.04);
+      if (item.broken) ctx.rotate(0.2);
+      const hw = LANE_W / 2 - 0.04, yb = -0.95, yt = -2.4, ceilY = -(camH + 6);
+      // kabels naar het plafond
+      ctx.strokeStyle = 'rgba(30,38,52,0.9)';
+      ctx.lineWidth = 0.025;
+      ctx.beginPath();
+      ctx.moveTo(-hw + 0.05, yt); ctx.lineTo(-hw * 0.7, ceilY);
+      ctx.moveTo(hw - 0.05, yt); ctx.lineTo(hw * 0.7, ceilY);
+      ctx.stroke();
       // net
-      ctx.fillStyle = 'rgba(15,25,45,0.55)';
+      ctx.fillStyle = 'rgba(15,25,45,0.5)';
       ctx.fillRect(-hw, yt, hw * 2, yb - yt);
-      ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+      ctx.strokeStyle = 'rgba(255,255,255,0.4)';
       ctx.lineWidth = 0.014;
       ctx.beginPath();
       for (let x = -hw; x <= hw + 0.001; x += 0.1) { ctx.moveTo(x, yt); ctx.lineTo(x, yb); }
       for (let y = yt; y <= yb + 0.001; y += 0.1) { ctx.moveTo(-hw, y); ctx.lineTo(hw, y); }
       ctx.stroke();
-      // witte band boven en onder
+      // witte band boven, verzwaarde stang onder
       ctx.fillStyle = '#fff';
-      ctx.fillRect(-hw, yt, hw * 2, 0.07);
-      ctx.fillStyle = C.blueD;
-      ctx.fillRect(-hw, yb - 0.035, hw * 2, 0.035);
+      ctx.fillRect(-hw, yt, hw * 2, 0.09);
+      ctx.fillStyle = OUTLINE;
+      roundRect(-hw - 0.03, yb - 0.07, hw * 2 + 0.06, 0.1, 0.05); ctx.fill();
+      ctx.fillStyle = C.blueM;
+      roundRect(-hw - 0.02, yb - 0.06, hw * 2 + 0.04, 0.08, 0.04); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      ctx.fillRect(-hw, yb - 0.05, hw * 2, 0.015);
       ctx.restore();
     }
 
@@ -973,6 +1016,7 @@
       ctx.save();
       if (item.broken) ctx.globalAlpha *= 0.3;
       const dm = (d0 + d1) / 2;
+      if (!item.broken) hazardStrip(xm, d0, d1);
       // stang naar het plafond
       ctx.strokeStyle = '#444b55';
       ctx.lineWidth = Math.max(1, 0.06 * f / dm);
@@ -981,18 +1025,15 @@
       ctx.lineTo(sx(xm, dm), sy(camH + 6, dm));
       ctx.stroke();
       // schaduw
-      ctx.fillStyle = 'rgba(0,0,0,0.12)';
+      ctx.fillStyle = 'rgba(0,0,0,0.16)';
       ctx.beginPath(); quadFloor(x0, x1, d0, d1); ctx.fill();
       // bovenkant
-      ctx.fillStyle = '#5a6270';
-      ctx.beginPath();
-      ctx.moveTo(sx(x0, d0), sy(yt, d0)); ctx.lineTo(sx(x1, d0), sy(yt, d0));
-      ctx.lineTo(sx(x1, d1), sy(yt, d1)); ctx.lineTo(sx(x0, d1), sy(yt, d1));
-      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#e0484d';
+      ctx.beginPath(); quadAt(x0, x1, d0, d1, yt); ctx.fill();
       // zijkant (de kant naar de camera)
       const xs = xm > camX ? x0 : x1;
       if (Math.abs(xm - camX) > hw) {
-        ctx.fillStyle = '#2a3039';
+        ctx.fillStyle = '#8d1519';
         ctx.beginPath();
         ctx.moveTo(sx(xs, d0), sy(yt, d0)); ctx.lineTo(sx(xs, d1), sy(yt, d1));
         ctx.lineTo(sx(xs, d1), sy(yb, d1)); ctx.lineTo(sx(xs, d0), sy(yb, d0));
@@ -1002,13 +1043,19 @@
       const s = f / d0;
       ctx.translate(sx(xm, d0), sy(0, d0));
       ctx.scale(s, s);
-      ctx.fillStyle = '#383f4a';
-      ctx.fillRect(-hw, -yt, hw * 2, yt - yb);
+      ctx.fillStyle = OUTLINE;
+      roundRect(-hw - 0.02, -yt - 0.02, hw * 2 + 0.04, yt - yb + 0.04, 0.06); ctx.fill();
       ctx.fillStyle = C.red;
-      ctx.fillRect(-hw, -yt, hw * 2, 0.1);
+      roundRect(-hw, -yt, hw * 2, yt - yb, 0.05); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.12)';
+      ctx.fillRect(-hw + 0.04, -yt + 0.04, hw * 2 - 0.08, 0.08);
+      ctx.fillStyle = C.chrome;
+      ctx.fillRect(-hw, -yb - 0.07, hw * 2, 0.05);
       ctx.fillStyle = C.gold;
-      ctx.fillRect(-hw, -yb - 0.06, hw * 2, 0.06);
+      ctx.fillRect(-hw, -yb - 0.03, hw * 2, 0.03);
       // venster met ballen
+      ctx.fillStyle = OUTLINE;
+      ctx.fillRect(-0.45, -1.58, 0.66, 0.41);
       ctx.fillStyle = '#cfe3f5';
       ctx.fillRect(-0.42, -1.55, 0.6, 0.35);
       ctx.fillStyle = '#ffffff';
@@ -1020,11 +1067,19 @@
       ctx.fill();
       ctx.fillStyle = '#ff8a1e';
       ctx.beginPath(); ctx.arc(-0.21, -1.42, 0.06, 0, Math.PI * 2); ctx.fill();
-      // uitwerpmond met knipperlampje
+      // uitwerpmond
       ctx.fillStyle = '#111';
       ctx.beginPath(); ctx.arc(0.36, -1.32, 0.11, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = (frame >> 4) & 1 ? '#ff3b30' : '#5a1210';
-      ctx.beginPath(); ctx.arc(0.36, -1.58, 0.04, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = C.chrome; ctx.lineWidth = 0.025;
+      ctx.beginPath(); ctx.arc(0.36, -1.32, 0.11, 0, Math.PI * 2); ctx.stroke();
+      // zwaailicht met gloed: al van ver te zien
+      const on = (frame >> 4) & 1;
+      if (on) {
+        ctx.fillStyle = 'rgba(255,80,60,0.28)';
+        ctx.beginPath(); ctx.arc(0.36, -1.62, 0.2, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.fillStyle = on ? '#ff3b30' : '#5a1210';
+      ctx.beginPath(); ctx.arc(0.36, -1.62, 0.055, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
     }
 
