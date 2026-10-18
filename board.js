@@ -98,11 +98,6 @@
         .slice(0, limit)
         .map(function (r) { return { name: r.name, score: r.score, seed: r.seed }; });
     }
-    function localBest() {
-      const rows = readLocal().sort(function (a, b) { return b.score - a.score; });
-      const r = rows[0];
-      return r ? { name: r.name, score: r.score, seed: r.seed } : null;
-    }
 
     /* ---------- Supabase, via gewone REST ---------- */
     function baseUrl() { return String(cfg.url).replace(/\/+$/, ''); }
@@ -218,30 +213,6 @@
           return offline;
         } catch (_) {
           return offline;   // geen netwerk, time-out of onleesbaar antwoord
-        }
-      },
-
-      /* oude route, tot app.js overstapt op submitRun */
-      async submit(input) {
-        input = input || {};
-        const score = cleanScore(input.score);
-        if (score === null) return { ok: false, source: 'local' };
-        const entry = {
-          name: cleanName(input.name) || 'Anoniem',
-          score: score,
-          seed: String(input.seed == null ? '' : input.seed).slice(0, 32)
-        };
-        addLocal(Object.assign({ created_at: new Date().toISOString() }, entry));
-        if (!remote) return { ok: true, source: 'local' };
-        try {
-          await request(endpoint('runner_scores'), {
-            method: 'POST',
-            headers: headers({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
-            body: JSON.stringify(entry)
-          });
-          return { ok: true, source: 'supabase' };
-        } catch (e) {
-          return { ok: true, source: 'local', error: String((e && e.message) || e) };
         }
       },
 

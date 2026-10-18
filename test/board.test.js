@@ -9,10 +9,10 @@ function memStorage() {
 
 test('aller tijden lokaal: per naam enkel de beste score, hoogste eerst', async () => {
   const b = createBoard({ provider: 'local', limit: 25 }, memStorage(), null);
-  await b.submit({ name: 'Jo', score: 500, seed: '2026-10-11' });
-  await b.submit({ name: 'Jo', score: 900, seed: '2026-10-12' });
-  await b.submit({ name: 'An', score: 700, seed: '2026-10-12' });
-  await b.submit({ name: 'jo', score: 300, seed: '2026-10-13' });   // zelfde naam, andere hoofdletters
+  await b.submitRun({ name: 'Jo', claimed: 500, seed: '2026-10-11' });
+  await b.submitRun({ name: 'Jo', claimed: 900, seed: '2026-10-12' });
+  await b.submitRun({ name: 'An', claimed: 700, seed: '2026-10-12' });
+  await b.submitRun({ name: 'jo', claimed: 300, seed: '2026-10-13' });   // zelfde naam, andere hoofdletters
   const { rows, source } = await b.allTime();
   assert.equal(source, 'local');
   assert.deepEqual(rows.map((r) => [r.name, r.score, r.seed]), [['Jo', 900, '2026-10-12'], ['An', 700, '2026-10-12']]);
@@ -41,7 +41,7 @@ test('aller tijden via Supabase: leest de view alltime_best, zonder extra rijen 
 test('aller tijden valt terug op lokaal als Supabase faalt', async () => {
   const fetchFn = async () => ({ ok: false, status: 500 });
   const b = createBoard({ provider: 'supabase', url: 'https://x.supabase.co', key: 'k' }, memStorage(), fetchFn);
-  await b.submit({ name: 'Jo', score: 42, seed: '2026-10-18' });
+  await b.submitRun({ name: 'Jo', claimed: 42, seed: '2026-10-18' });
   const { rows, source } = await b.allTime();
   assert.equal(source, 'local');
   assert.deepEqual(rows.map((r) => r.score), [42]);
@@ -113,9 +113,9 @@ test('submitRun: lokale provider doet geen netwerkaanroep', async () => {
 
 test('top lokaal: per naam enkel de beste score (hoofdletters tellen niet)', async () => {
   const b = createBoard({ provider: 'local' }, memStorage(), null);
-  await b.submit({ name: 'Jo', score: 900, seed: '2026-10-18' });
-  await b.submit({ name: 'jo', score: 500, seed: '2026-10-18' });
-  await b.submit({ name: 'An', score: 700, seed: '2026-10-18' });
+  await b.submitRun({ name: 'Jo', claimed: 900, seed: '2026-10-18' });
+  await b.submitRun({ name: 'jo', claimed: 500, seed: '2026-10-18' });
+  await b.submitRun({ name: 'An', claimed: 700, seed: '2026-10-18' });
   const { rows, source } = await b.top('2026-10-18');
   assert.equal(source, 'local');
   assert.deepEqual(rows.map((r) => [r.name, r.score]), [['Jo', 900], ['An', 700]]);
