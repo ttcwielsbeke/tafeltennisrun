@@ -216,6 +216,7 @@
         }
       },
 
+      cleanName: cleanName,
       getName() { return cleanName(read(NAME_KEY)); },
       setName(name) {
         const n = cleanName(name);

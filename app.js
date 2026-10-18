@@ -22,7 +22,12 @@
   let queue = [];
   let overAt = 0;
   let milestone = 0;          // hoeveel keer 500 m we al gelopen hebben
+  let recorder = null;        // legt de invoer van een dagrun vast (null bij een oefenronde)
+  let pendingRun = null;      // de afgeronde dagrun, klaar om (met een naam erbij) in te sturen
+  let lastRun = null;         // het laatst verstuurde pakket, voor TTR.debug.lastRun
+  let overToken = 0;          // telt de game-overs: een laat antwoord op een oude run telt niet meer
 
+  const NAME_LABEL = 'Je naam voor de ranglijst';
   const CRASH = {
     nopper: 'Door de noppen gegaan!',
     table: 'Tegen de clubtafel geknald!',
@@ -89,6 +94,8 @@
     loop.reset();
     mode = 'run';
     milestone = 0;
+    recorder = practice ? null : TTR.createRecorder();
+    pendingRun = null;
     show(null);
     audio.startAmbience();
     canvas.focus && canvas.focus();
@@ -128,24 +135,86 @@
     show('over');
 
     const seed = game.seed;
+    overToken++;
+    $('name-label').textContent = NAME_LABEL;
     if (practice) {
+      pendingRun = null;
       $('submit-note').textContent = 'Oefenronde: telt niet mee voor de ranglijst.';
       loadBoard(TTR.dailySeed(), null);
-    } else if (board.getName()) {
-      submit(board.getName(), score, seed);
     } else {
-      $('name-form').hidden = false;
-      $('name-input').value = '';
-      loadBoard(seed, null);
+      // het pakket voor de server: de run zelf, nog zonder naam
+      const secret = deviceSecret();
+      pendingRun = {
+        seed, secret: secret || '', version: window.TTR_CONFIG.game.version,
+        frames: game.frame, inputs: recorder.inputs, claimed: score, kit: skin
+      };
+      pendingRun.noSecret = secret === null;
+      if (board.getName()) {
+        submitRun(board.getName());
+      } else {
+        $('name-form').hidden = false;
+        $('name-input').value = '';
+        loadBoard(seed, null);
+      }
     }
   }
 
-  async function submit(name, score, seed) {
+  /* ---------- apparaatgeheim: bewijst dat een naam altijd van hetzelfde toestel komt ---------- */
+  let secretMem = null;
+  function deviceSecret() {
+    if (secretMem) return secretMem;
+    const stored = load('ttr_secret');
+    if (stored && /^[0-9a-f]{64}$/.test(stored)) return (secretMem = stored);
+    const c = window.crypto;
+    if (!c || typeof c.getRandomValues !== 'function') return null;
+    const bytes = new Uint8Array(32);
+    c.getRandomValues(bytes);
+    secretMem = Array.from(bytes, (b) => (b < 16 ? '0' : '') + b.toString(16)).join('');
+    save('ttr_secret', secretMem);
+    return secretMem;
+  }
+
+  // zonder crypto kan de server de run niet koppelen aan een toestel: dan enkel lokaal bewaren
+  let localOnlyBoard = null;
+
+  // stuurt de afgeronde dagrun in met deze naam; de naam wordt pas onthouden als de server hem aanvaardt
+  async function submitRun(rawName) {
+    const run = pendingRun;
+    if (!run) return;
+    const token = overToken;
+    const name = board.cleanName(rawName);
+    const payload = Object.assign({ name }, run);
+    delete payload.noSecret;
+    lastRun = payload;
     $('submit-note').textContent = 'Score bewaren…';
-    const res = await board.submit({ name, score, seed });
-    $('submit-note').textContent = !res.ok ? 'Score kon niet bewaard worden.'
-      : 'Score bewaard als ' + name + (res.source === 'supabase' ? '.' : ', op dit toestel.');
-    loadBoard(seed, { name, score });
+    let res;
+    if (run.noSecret) {
+      localOnlyBoard = localOnlyBoard || TTR.createBoard({ provider: 'local' });
+      res = await localOnlyBoard.submitRun(payload);
+    } else {
+      res = await board.submitRun(payload);
+    }
+    // geen verdict van de server (offline), of door hem aanvaard: dan onthouden we de naam
+    if (res.ok) board.setName(name);
+    if (token !== overToken) return;     // intussen is er al een nieuwe run
+    const note = $('submit-note');
+    if (res.ok && res.source === 'supabase') {
+      note.textContent = res.newBest ? 'Score geverifieerd ✓ — nieuw persoonlijk record!' : 'Score geverifieerd ✓';
+      loadBoard(run.seed, { name, score: res.score });
+    } else if (res.ok) {
+      note.textContent = 'Score enkel op dit toestel bewaard';
+      loadBoard(run.seed, { name, score: res.score });
+    } else if (res.code === 'name') {
+      note.textContent = '';
+      $('name-label').textContent = 'Deze naam is al in gebruik, kies een andere.';
+      $('name-form').hidden = false;
+      $('name-input').value = '';
+      $('name-input').focus();
+      loadBoard(run.seed, null);
+    } else {
+      note.textContent = res.message || 'Score kon niet bewaard worden.';
+      loadBoard(run.seed, null);
+    }
   }
 
   // rijen in een <ol>; is(r) zegt welke rij van jou is (enkel de eerste wordt gemarkeerd)
@@ -177,7 +246,7 @@
     $('board-title').textContent = 'Ranglijst TTC Wielsbeke-Spotit · ' + seed;
     $('board-note').textContent = 'Laden…';
     const { rows, source } = await board.top(seed);
-    fillList($('board-list'), rows, (r) => !!mine && r.name === mine.name && r.score === mine.score,
+    fillList($('board-list'), rows, (r) => !!mine && String(r.name).toLowerCase() === mine.name.toLowerCase() && r.score === mine.score,
       'Nog niemand van de club vandaag. Jij eerst!', false);
     $('board-note').textContent = sourceNote(source, rows.length);
     showBest();
@@ -265,9 +334,10 @@
   $('btn-sound').addEventListener('click', (e) => { setSound(!audio.on); e.currentTarget.blur(); });
   $('name-form').addEventListener('submit', (e) => {
     e.preventDefault();
-    const name = board.setName($('name-input').value);
+    const name = board.cleanName($('name-input').value);
+    if (!name) { $('name-input').focus(); return; }
     $('name-form').hidden = true;
-    submit(name, TTR.scoreOf(game), game.seed);
+    submitRun(name);
   });
   document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
 
@@ -277,6 +347,7 @@
       if (mode !== 'run') return;
       const acts = queue; queue = [];
       const lane0 = game.lane, air0 = game.y > 0;
+      if (recorder) recorder.add(game.frame, acts);
       TTR.step(game, acts);
       for (const ev of game.events) {
         if (ev === 'lane') audio.play('lane', { dir: Math.sign(game.lane - lane0) });
@@ -307,5 +378,6 @@
   requestAnimationFrame(tick);
 
   // voor de browsertest en wie wil spieken: de huidige toestand
-  window.TTR.debug = { board, audio, get game() { return game; }, get mode() { return mode; } };
+  window.TTR.debug = { board, audio, get game() { return game; }, get mode() { return mode; },
+                      get lastRun() { return lastRun; } };
 })();
