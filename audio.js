@@ -113,9 +113,9 @@
         env(g, t, 0.012, 0.22, 0.17);
         sq.connect(bp); bp.connect(g); g.connect(out);
         sq.start(t); vib.start(t); sq.stop(t + 0.25); vib.stop(t + 0.25);
-        hiss(t + 0.03, 'bandpass', 2600, 480, 0.9, 0.03, 0.52, 0.75);  // schuiven over het parket
-        hiss(t + 0.03, 'lowpass', 900, 280, 0.7, 0.05, 0.4, 0.28);
-        tone(t + 0.02, 'sine', 140, 55, 0.005, 0.14, 0.35);              // romp raakt de vloer
+        hiss(t + 0.03, 'bandpass', 2600, 480, 0.9, 0.07, 0.52, 0.75);  // schuiven over het parket, zwelt aan
+        hiss(t + 0.05, 'lowpass', 900, 280, 0.7, 0.12, 0.36, 0.12);   // zacht gerommel eronder
+        tone(t + 0.06, 'sine', 110, 50, 0.03, 0.16, 0.045);              // romp raakt zacht de vloer
       },
       // springen: wind omhoog en een veerkrachtig toontje
       jump(t) {
