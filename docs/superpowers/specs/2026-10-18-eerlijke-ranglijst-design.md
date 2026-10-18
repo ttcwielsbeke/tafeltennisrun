@@ -46,9 +46,10 @@ bij een botsing ──POST──────▶  submit-run
                                  1. vorm + versie + datum
                                  2. replay(seed, frames, inputs)
                                  3. naam ↔ geheim
-                                 4. tempolimiet
-                                 5. bewaren ─────────────────────▶ runs, best_inputs
-        ◀──────── { ok, score, personalBest, todayBest }
+                                 4. kopie? (zelfde invoer al ingestuurd)
+                                 5. tempolimiet
+                                 6. bewaren ─────────────────────▶ runs, best_inputs
+        ◀──────── { ok, score, personalBest, todayBest, newBest }
 ranglijst lezen ──GET (anon)─────────────────────────────────────▶ views daily_best, alltime_best
 ```
 
@@ -86,15 +87,23 @@ Eén SQL-bestand, in de SQL Editor te plakken, opnieuw draaien mag (idempotent: 
 - `crash text not null` (`nopper` | `table` | `net` | `machine`)
 - `frames int not null` (lengte van de run in 1/60 s)
 - `kit text not null`
+- `inputs_hash text not null`: SHA-256 (hex) van `JSON.stringify([frames, inputs])`, met `inputs` genormaliseerd
+  tot paren `[frame, actie]` (dezelfde lijst als in `best_inputs`). Unieke index `(seed, inputs_hash)`:
+  dezelfde invoer op dezelfde seed telt maar één keer (zie §6.2 stap 6). Op een bestaande database voegt
+  `alter table runs add column if not exists inputs_hash text` de kolom toe (oude rijen blijven leeg; een
+  lege waarde botst niet in de unieke index).
 - `created_at timestamptz not null default now()`
 - checks (extra laag; de Edge Function rekent al juist, dit vangt fouten op):
   - alle tellers `>= 0`, `score between 0 and 1000000`, `frames between 1 and 108000` (30 min)
   - `score <= dist + balls * 20` (meer kan niet: 10 per bal, ×2 met de ballenbak)
   - `dist <= frames * 40 / 60 + 1` (40 m/s is een ruime bovengrens; de topsnelheid moet daar onder blijven,
     ook na de moeilijkheidsopbouw)
-- indexen: `(seed, score desc)`, `(player_id, created_at desc)` (tempolimiet), `(score desc)`
+- indexen: `(seed, score desc)`, `(player_id, created_at desc)` (tempolimiet), `(score desc)`,
+  uniek `(seed, inputs_hash)` (kopieën)
 
-**`best_inputs`** — publiek leesbaar (spookloper later)
+**`best_inputs`** — privé: enkel de Edge Function (service-rol) leest en schrijft. Wie de invoer van een
+ander kan lezen, kan die run insturen; daarom is er geen lees-policy en geen `select`-recht voor het publiek.
+Weer openzetten wanneer de spookloper gebouwd wordt (en dan ook de kopie-controle van §6.2 behouden).
 - `player_id uuid references players(id) on delete cascade`, `seed text`, primary key `(player_id, seed)`
 - `score int not null`, `game_version int not null`, `frames int not null`
 - `inputs jsonb not null` (`[[frame, actie], …]`)
@@ -113,10 +122,12 @@ De ranglijst sorteert daarna op `score desc` en neemt de top 25.
 ### 5.3 Toegang (RLS)
 
 - RLS aan op alle vier de tabellen.
-- `anon` en `authenticated`: `select` op `players`, `runs`, `best_inputs` en de twee views. Geen `insert`,
-  `update` of `delete` op wat dan ook. Op `player_secrets`: geen enkel recht.
+- `anon` en `authenticated`: `select` op `players`, `runs` en de twee views. Geen `insert`,
+  `update` of `delete` op wat dan ook. Op `player_secrets` en `best_inputs`: geen enkel recht en geen policy.
 - De service-rol (Edge Function) omzeilt RLS zoals altijd in Supabase.
-- `runner_scores`: `revoke insert` voor `anon` en `authenticated`, de lees-policy blijft.
+- `runner_scores`: de toevoeg-policy `"runner_scores toevoegen"` gaat weg en `insert`, `update`, `delete`
+  worden ingetrokken voor `anon` en `authenticated`; de lees-policy blijft. Het oude bestand
+  `supabase/runner_scores.sql` is als verouderd gemarkeerd en zet zelf ook geen toevoegrechten meer.
 
 ## 6. Edge Function `submit-run`
 
@@ -125,7 +136,12 @@ gedeelde bestanden in `supabase/functions/_shared/` (`config.js`, `rng.js`, `wor
 
 ### 6.1 Verzoek
 
-`POST /functions/v1/submit-run`, met de publieke anon-sleutel als `Authorization` (standaard Supabase).
+`POST /functions/v1/submit-run`, met de publieke sleutel (`sb_publishable_…`) als `apikey` en `Authorization`.
+
+Geen JWT-controle aan de poort (beslissing G): `verify_jwt = false` in `supabase/config.toml` en deployen met
+`supabase functions deploy submit-run --no-verify-jwt`. De publieke sleutel is geen JWT, dus de poort zou elke
+oproep van het spel met 401 weigeren. De functie beschermt zichzelf: elke run wordt opnieuw afgespeeld en de
+naam hangt aan het toestelgeheim.
 
 ```json
 { "seed": "2026-10-18", "name": "Jo", "secret": "<64 hex>", "version": 1,
@@ -134,7 +150,9 @@ gedeelde bestanden in `supabase/functions/_shared/` (`config.js`, `rng.js`, `wor
 
 CORS: enkel de oorsprong uit het geheim `ALLOWED_ORIGIN` (komma-gescheiden lijst) plus `http://localhost:*`
 en `http://127.0.0.1:*` voor ontwikkelen. CORS is geen beveiliging (een script trekt er zich niets van aan);
-de herberekening is dat wel.
+de herberekening is dat wel. Een browser van een andere oorsprong krijgt 403 met code `origin` ("Deze site mag
+geen scores insturen."); een andere methode dan `POST` of `OPTIONS` krijgt 405 met code `method` en de
+algemene melding "Er ging iets mis bij het bewaren.".
 
 ### 6.2 Controles, in volgorde
 
@@ -151,13 +169,22 @@ de herberekening is dat wel.
 5. **Naam.** SHA-256 van `secret`. Naam onbekend → `players` + `player_secrets` aanmaken (claim).
    Naam bekend → hash vergelijken; anders → 409, "Deze naam is al in gebruik op een ander toestel."
    Twee claims tegelijk: de unieke index beslist; wie verliest, krijgt dezelfde 409.
-6. **Tempo.** Laatste run van deze speler minder dan 5 s geleden → 429, "Even geduld…"
-7. **Bewaren.** Rij in `runs`. Is dit de beste score van de speler op deze `seed`, dan `best_inputs` upserten.
+6. **Kopie.** `inputs_hash` = SHA-256 (hex) van `JSON.stringify([frames, inputs])` met genormaliseerde paren
+   `[frame, actie]`. Bestaat er in `runs` al een rij met dezelfde `(seed, inputs_hash)`, van wie dan ook →
+   409, code `copy`, "Deze run werd al ingestuurd." Twee keer dezelfde run tegelijk: de unieke index beslist;
+   een `23505` bij het bewaren geeft dezelfde 409 `copy`.
+7. **Tempo.** De vorige run van deze speler is minder dan `max(2, frames / 60 − 1)` seconden geleden bewaard
+   → 429, "Even geduld…". Een echte run duurt `frames / 60` s, dus wie gewoon speelt, botst hier nooit op;
+   de seconde speling dekt netwerkvertraging. (Een vaste 5 s zou korte runs na elkaar onterecht weigeren.)
+8. **Bewaren.** Rij in `runs` (met `inputs_hash`). Is dit de beste score van de speler op deze `seed`, dan
+   `best_inputs` upserten.
 
 ### 6.3 Antwoord
 
-- Gelukt: `200 { ok: true, score, personalBest, todayBest }` — `score` = herberekend; `personalBest` = beste
-  ooit van deze speler (na deze run); `todayBest` = beste van vandaag van deze speler.
+- Gelukt: `200 { ok: true, score, personalBest, todayBest, newBest }` — `score` = herberekend; `personalBest` =
+  beste ooit van deze speler (na deze run); `todayBest` = beste op deze seed van deze speler; `newBest` = `true`
+  als deze run hoger is dan zijn beste ooit vóór deze run (of zijn eerste run is). Het eindscherm toont dan
+  "nieuw persoonlijk record!".
 - Fout: `{ ok: false, code, message }` met de statuscode hierboven; `message` is Nederlands en mag zo op
   het scherm. Onverwachte fout → 500, "Er ging iets mis bij het bewaren."
 - Afwijking tussen `claimed` en herberekende score → `console.warn` met seed, versie en beide scores.
@@ -193,8 +220,14 @@ in dezelfde commit. De eerste versie die we zo vastleggen, bevat al de moeilijkh
 - **Na een botsing**: `board.submitRun(...)`. Het eindscherm toont eerst "Score bewaren…", daarna één van:
   "Score geverifieerd ✓", "Score geverifieerd ✓ — nieuw persoonlijk record!", de foutmelding van de server,
   of "Score enkel op dit toestel bewaard" (geen verbinding).
-- **Naam bezet (409)**: het naamformulier gaat weer open met "Deze naam is al in gebruik, kies een andere."
-  Een naam wordt pas onthouden als de server hem aanvaardt.
+- **Naam bezet (409 `name`)**: het naamformulier gaat weer open met "Deze naam is al in gebruik, kies een andere."
+  Een naam wordt onthouden als de server hem aanvaardt, en ook bij een resultaat zonder verdict (offline of
+  `?lokaal`, beslissing A): dan is er niets dat tegen de naam pleit. Botst hij later toch, dan vraagt het spel
+  na die run opnieuw een naam.
+- **Kopie (409 `copy`)** en andere weigeringen: de melding van de server komt op het eindscherm; het
+  naamformulier gaat niet open.
+- **Nieuwe run of terug naar het titelscherm** terwijl het antwoord nog onderweg is: dat late antwoord
+  tekent niets meer (het naamformulier gaat dan ook niet open).
 - **Eerste keer**: zoals nu vraagt het spel na de eerste run de naam; daarna gaat alles vanzelf.
 
 ### 7.4 `board.js`
@@ -210,7 +243,9 @@ in dezelfde commit. De eerste versie die we zo vastleggen, bevat al de moeilijkh
 ## 8. Wat dit wel en niet tegenhoudt
 
 **Wel**: verzonnen scores, aangepaste scores, scores op een andere dag dan vandaag/gisteren, scores onder
-andermans naam, honderden inzendingen na elkaar.
+andermans naam, honderden inzendingen na elkaar, en **kopieën**: een invoerlijst die al eens werd ingestuurd
+op dezelfde seed (de eigen run opnieuw, of één run onder vele namen) wordt geweigerd (409 `copy`), en de
+invoerlijsten van anderen (`best_inputs`) zijn niet publiek leesbaar tot de spookloper er is.
 
 **Niet**: iemand die een **bot** schrijft. De code en de baan zijn publiek; wie een programma maakt dat de
 dagbaan foutloos speelt, levert een echte, geldige invoerlijst. Dat is veel moeilijker dan een getal sturen,
@@ -218,6 +253,9 @@ maar niet onmogelijk. Twee dingen beperken het:
 - de moeilijkheidsopbouw (§10) maakt lange runs zwaar, ook voor wie de baan op voorhand bestudeert;
 - **moderatie**: in het Supabase-dashboard kan Jo de runs van een speler wissen (of de speler zelf; `on delete
   cascade` ruimt alles op). De views passen zich vanzelf aan.
+
+De autopiloot uit de tests (`test/bot.js`) overleeft de volle 30 minuten: een bot kan de ranglijst dus
+aanvoeren. Dat aanvaarden we; moderatie haalt zulke runs weg.
 
 ## 9. Testen
 
@@ -233,8 +271,10 @@ maar niet onmogelijk. Twee dingen beperken het:
   lokale daglijst zonder dubbels.
 - **Edge Function**: lokaal te draaien met `supabase functions serve submit-run`; README beschrijft een
   handmatige proef met `curl` (een echte run, een aangepaste score, een bezette naam).
-- **SQL**: README beschrijft de handmatige controles: insert als anon faalt, `player_secrets` lezen als anon
-  faalt, de views geven één rij per speler.
+- **SQL**: README beschrijft de handmatige controles met `curl` en de publieke sleutel (zonder toestand in de
+  SQL Editor): `player_secrets` lezen faalt (42501), een rij in `runs` toevoegen faalt (42501), `daily_best`
+  lezen werkt. De curl-proef van de Edge Function gebruikt een run die met `?lokaal` gespeeld werd (dus nog
+  niet ingestuurd) en eindigt met dezelfde run nog eens → 409 `copy`.
 
 ## 10. Volgorde van het werk
 
@@ -248,7 +288,7 @@ maar niet onmogelijk. Twee dingen beperken het:
 1. Supabase CLI installeren.
 2. `supabase login` en `supabase link --project-ref aqaikstibteqcdgxtuiw`.
 3. `supabase/runner_v2.sql` plakken in de SQL Editor en draaien.
-4. `supabase functions deploy submit-run`.
+4. `supabase functions deploy submit-run --no-verify-jwt` (zie §6.1).
 5. `supabase secrets set ALLOWED_ORIGIN=https://boermansjo.github.io`.
 
 Supabase geeft de functie zelf `SUPABASE_URL` en `SUPABASE_SERVICE_ROLE_KEY`.

@@ -37,6 +37,8 @@ Open `index.html` of speel online (GitHub Pages, zie onder).
   een time-out, publiek dat juicht om de 500 m, en zacht geroezemoes met rally's aan tafels verderop.
 
 Bij je eerste score vraagt het spel je naam (max. 16 tekens); die wordt onthouden op je toestel.
+Je naam hangt aan een geheim dat in je browser bewaard blijft: speel je in een privévenster of wis je de
+browsergegevens, dan is dat geheim weg en kun je die naam niet meer gebruiken.
 Daarna gaat elke score van de dagbaan vanzelf naar de ranglijst: de top 25 van vandaag, plus
 "beste ooit" op het titelscherm.
 De knop **Ranglijst** (op het titelscherm en na een run) toont twee lijsten: **Vandaag** (de top 25
@@ -65,6 +67,9 @@ node --test
 - `test/skins.test.js`: welke tenues bij welke beste score horen, en dat elk tenue een tekening heeft.
 - `test/board.test.js`: de ranglijst aller tijden houdt per speler de beste score, ook via Supabase, met terugval op lokaal.
 - `test/audio.test.js`: zonder Web Audio loopt het spel gewoon (geluid doet dan niets), en elke gebeurtenis heeft een geluid.
+- `test/replay.test.js`: een opgenomen run geeft bij herberekening exact dezelfde afloop, pauzes tellen niet, foute invoer wordt geweigerd.
+- `test/sync.test.js`: de kopie van de spelcode in `supabase/functions/_shared/` is gelijk aan het origineel.
+- `test/submit-core.test.js`: de controles van de Edge Function: vorm, versie, datumvenster, herberekening, tempolimiet en de vaste meldingen.
 
 Pas je `config.js` of `world.js` aan, dan veranderen de "gouden" scores in `test/game.test.js`. Dat is de bedoeling: bereken ze opnieuw en pas ze bewust aan.
 
@@ -72,30 +77,34 @@ Pas je `config.js` of `world.js` aan, dan veranderen de "gouden" scores in `test
 
 De ranglijst gebruikt hetzelfde Supabase-project als PIPS OUT!, met eigen tabellen
 (`players`, `runs`, `best_inputs`, `player_secrets`) en twee views (`daily_best`, `alltime_best`).
-Het publiek mag alleen lezen. Schrijven kan enkel een Supabase Edge Function met de service-rol.
+Het publiek mag alleen lezen (`player_secrets` en `best_inputs` zelfs dat niet). Schrijven kan enkel een
+Supabase Edge Function met de service-rol.
 
 1. Open het Supabase-project en ga naar **SQL Editor**.
 2. Plak de inhoud van [`supabase/runner_v2.sql`](supabase/runner_v2.sql) en klik op **Run**.
    Je mag het gerust opnieuw draaien, er gaat niets stuk.
-3. Controleer de rechten. Plak dit in de SQL Editor en voer de regels **één voor één** uit
-   (de eerste twee moeten een foutmelding geven, de derde moet rijen of een lege lijst teruggeven):
+3. Controleer de rechten met drie `curl`-verzoeken, net zoals het publiek ze zou doen. Vervang
+   `<publishable key>` door de publieke sleutel uit `config.js`; in PowerShell typ je `curl.exe` in plaats
+   van `curl`; met `-i` erbij zie je ook de statuscode. Maak eerst een bestand `rij.json` met als inhoud
+   `{"seed":"2026-01-01"}`.
 
-   ```sql
-   set role anon;
+   - **Geheimen lezen** moet mislukken: `401` met `"code":"42501"` (permission denied):
 
-   -- moet mislukken: "permission denied" of "row-level security"
-   insert into runs (player_id, seed, game_version, score, dist, balls, jumps, slides, lanes,
-                     shields, magnets, timeouts, bakken, blocks, crash, frames, kit)
-   values (gen_random_uuid(), '2026-01-01', 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 'table', 60, 'x');
+     ```sh
+     curl -H "apikey: <publishable key>" -H "Authorization: Bearer <publishable key>" "https://aqaikstibteqcdgxtuiw.supabase.co/rest/v1/player_secrets?select=*"
+     ```
 
-   -- moet mislukken: "permission denied for table player_secrets"
-   select * from player_secrets;
+   - **Zelf een run toevoegen** moet mislukken: `401` met `"code":"42501"`:
 
-   -- moet werken
-   select * from daily_best limit 5;
+     ```sh
+     curl -H "apikey: <publishable key>" -H "Authorization: Bearer <publishable key>" -H "Content-Type: application/json" --data "@rij.json" https://aqaikstibteqcdgxtuiw.supabase.co/rest/v1/runs
+     ```
 
-   reset role;
-   ```
+   - **De ranglijst lezen** moet werken: `200` met `[]` of een paar rijen:
+
+     ```sh
+     curl -H "apikey: <publishable key>" -H "Authorization: Bearer <publishable key>" "https://aqaikstibteqcdgxtuiw.supabase.co/rest/v1/daily_best?select=*&limit=5"
+     ```
 
 4. Klaar: de url en de publieke key staan al in `config.js`.
 
@@ -110,7 +119,8 @@ afstand plus ballen kan opleveren, of een afstand die in die tijd niet te lopen 
 
 De functie `submit-run` (`supabase/functions/submit-run/`) krijgt van het spel de invoerlijst van een
 dagrun, speelt die opnieuw af met dezelfde spelcode, claimt of controleert de naam met het
-toestelgeheim, past de tempolimiet toe en bewaart de run. Eenmalig installeren:
+toestelgeheim, weigert een run die al eens werd ingestuurd (zelfde seed, zelfde invoer), past de
+tempolimiet toe en bewaart de run. Eenmalig installeren:
 
 1. Installeer de Supabase CLI: <https://supabase.com/docs/guides/cli>.
 2. Meld je aan en koppel het project (vanuit de map van deze repo):
@@ -134,31 +144,35 @@ toestelgeheim, past de tempolimiet toe en bewaart de run. Eenmalig installeren:
    (`sb_publishable_…` in `config.js`) is geen JWT. De functie beschermt zichzelf door elke run
    opnieuw af te spelen en de naam aan het toestelgeheim te koppelen.
 
-4. Controleer met drie `curl`-verzoeken. Speel eerst een **dagrun** in de browser en kopieer daarna in
-   de console van de ontwikkelaarstools de run naar het klembord:
+4. Controleer met vier `curl`-verzoeken. Speel eerst één **dagrun** met `?lokaal` in de url (bv.
+   <http://localhost:8132/?lokaal>): dan stuurt het spel niets naar de functie, maar het pakket staat
+   wel klaar. Kopieer het daarna in de console van de ontwikkelaarstools naar het klembord:
 
    ```js
    copy(JSON.stringify(TTR.debug.lastRun))
    ```
 
-   (`TTR.debug.lastRun` bestaat zodra het spel de runs naar de functie stuurt.) Plak dat in een bestand
-   `run.json`. Vervang `<publishable key>` hieronder door de publieke sleutel uit `config.js` (net
-   wat het spel meestuurt); in PowerShell typ je `curl.exe` in plaats van `curl`.
+   Plak dat in een bestand `run.json`. Let op: `run.json` bevat het geheim van je toestel, deel het
+   met niemand. Vervang `<publishable key>` hieronder door de publieke sleutel uit `config.js` (net
+   wat het spel meestuurt); in PowerShell typ je `curl.exe` in plaats van `curl`; met `-i` erbij zie je
+   ook de statuscode.
 
    - **Echte run** → `{"ok":true,"score":…,"personalBest":…,"todayBest":…,"newBest":…}`:
 
      ```sh
-     curl -H "apikey: <publishable key>" -H "Content-Type: application/json" --data @run.json https://aqaikstibteqcdgxtuiw.supabase.co/functions/v1/submit-run
+     curl -H "apikey: <publishable key>" -H "Content-Type: application/json" --data "@run.json" https://aqaikstibteqcdgxtuiw.supabase.co/functions/v1/submit-run
      ```
 
    - **Vervalste run**: kopieer `run.json` naar `run-vals.json` en tel 30 op bij `frames`. Dezelfde
-     opdracht met `--data @run-vals.json` geeft `400` en `{"ok":false,"code":"replay",…}`.
+     opdracht met `--data "@run-vals.json"` geeft `400` en `{"ok":false,"code":"replay",…}`.
    - **Naam van een ander toestel**: kopieer `run.json` naar `run-naam.json` en vervang `secret` door
-     64 andere hex-tekens (bv. 64 nullen). Met `--data @run-naam.json` krijg je `409` en
+     64 andere hex-tekens (bv. 64 nullen). Met `--data "@run-naam.json"` krijg je `409` en
      `{"ok":false,"code":"name",…}`.
+   - **Dezelfde run nog eens**: de eerste opdracht opnieuw, met `--data "@run.json"`, geeft `409` en
+     `{"ok":false,"code":"copy",…}`: een run telt maar één keer.
 
    De run van de eerste controle staat daarna echt in de ranglijst (het is een gewone run).
-   Stuur je dezelfde run binnen een paar seconden opnieuw, dan krijg je `429` (`"code":"rate"`).
+   Twee verschillende runs vlak na elkaar insturen geeft `429` (`"code":"rate"`).
    Een run van eergisteren of ouder geeft `400` (`"code":"date"`): enkel vandaag en gisteren tellen.
 
 ### Moderatie
@@ -166,6 +180,9 @@ toestelgeheim, past de tempolimiet toe en bewaart de run. Eenmalig installeren:
 Valt er een score of speler op die er niet hoort te staan? Open in Supabase de **Table Editor**,
 kies `players` en wis de speler (of kies `runs` en wis alleen die ene run). Door `on delete cascade`
 verdwijnen bij een speler ook alle runs en invoerlijsten, en de views passen zich vanzelf aan.
+
+De ranglijst is beschermd tegen geknoei met scores en tegen gekopieerde runs, niet tegen iemand die een
+bot schrijft die de baan echt speelt: zulke runs haal je hier met de hand weg.
 
 ## Hosten op GitHub Pages
 
@@ -193,7 +210,7 @@ Het lege bestand `.nojekyll` zorgt dat GitHub de bestanden ongewijzigd serveert.
 | `board.js` | ranglijst: Supabase, met `localStorage` als vangnet |
 | `app.js` | schermen, knoppen, geluid en de animatielus |
 | `supabase/runner_v2.sql` | de tabellen, views en rechten van de eerlijke ranglijst |
-| `supabase/runner_scores.sql` | de oude tabel en de rechten |
+| `supabase/runner_scores.sql` | verouderd: de oude tabel, enkel nog leesbaar (gebruik `runner_v2.sql`) |
 | `supabase/functions/submit-run/` | de Edge Function: `index.ts` (HTTP, naam, database) en `core.js` (de controles) |
 | `supabase/functions/_shared/` | kopie van de spelcode voor de herberekening op de server |
 | `supabase/config.toml` | instellingen voor de Supabase CLI |
@@ -215,7 +232,7 @@ Eenheden: afstand in meter, tijd in frames van 1/60 s. Banen zijn `0` (links), `
 
 ```js
 TTR_CONFIG = {
-  board: { provider: 'supabase' | 'local', url, key, table: 'runner_scores', limit: 25 },
+  board: { provider: 'supabase' | 'local', url, key, limit: 25 },
   game:  { startSpeed, accel, cruiseSpeed, lateAccel, maxSpeed, jumpVel, gravity, slideFrames, laneFrames,
            ballPoints, magnetFrames, magnetReach, shieldGraceFrames,
            timeoutFrames, timeoutSlow, bakFrames },
@@ -287,7 +304,10 @@ TTR_CONFIG = {
 - `board.top(seed) → Promise<{ rows: {name, score, created_at}[], source: 'supabase'|'local' }>` (top 25)
 - `board.best() → Promise<{ row: {name, score, seed} | null, source }>` (beste ooit)
 - `board.allTime() → Promise<{ rows: {name, score, seed}[], source }>` — aller tijden, per speler (naam zonder hoofdletters) enkel de beste score, top 25.
-- `board.submit({ name, score, seed }) → Promise<{ ok: bool, source }>` — bewaart altijd ook lokaal.
+- `board.submitRun({ seed, name, secret, version, frames, inputs, claimed, kit }) → Promise<{ ok, source, … }>` —
+  stuurt de run naar de Edge Function `submit-run` en bewaart ze altijd ook lokaal. Antwoord: `ok` + `'supabase'`
+  met `score, personalBest, todayBest, newBest`; niet `ok` + `'supabase'` met `code, message`; of `ok` + `'local'`
+  met `offline: true`.
 - `board.getName() / board.setName(name)` — onthouden in `localStorage`.
 - Valt stil terug op `localStorage` als url/key leeg zijn of Supabase niet antwoordt.
 
