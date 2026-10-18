@@ -78,7 +78,7 @@
     let W = 0, H = 0, dpr = 1, cssW = -1, cssH = -1;
     // camera
     let f = 1, camH = 3, cx = 0, hy = 0;
-    let fogGrad = null, floorGrad = null, vignette = null;
+    let fogGrad = null, floorGrad = null, vignette = null, vigKey = '', vigCanvas = null;
     let bg = null, bgKey = '', fontKey = 0;
     // het pixellettertype komt later binnen: dan het panorama opnieuw schilderen
     try {
@@ -623,6 +623,21 @@
       ctx.save();
       ctx.translate(sx(p.x, d), sy(0, d));
       ctx.scale(s, s);
+      if (s < 9) {
+        // ver weg: een paar pixels hoog, dus een silhouet van twee vlakken volstaat
+        if (p.kind === 'fan') {
+          ctx.fillStyle = FAN_SHIRTS[p.seed % FAN_SHIRTS.length];
+          ctx.fillRect(-0.25, -1.45, 0.5, 0.6);
+          ctx.fillStyle = C.skin;
+          ctx.fillRect(-0.2, -0.85, 0.4, 0.85);
+          ctx.fillRect(-0.12, -1.74, 0.24, 0.26);
+        } else {
+          ctx.fillStyle = p.kind === 'basket' ? C.blueM : '#0d2c57';
+          ctx.fillRect(-0.36, -1.0, 0.72, 1.0);
+        }
+        ctx.restore();
+        return;
+      }
       shadow(0.45);
       if (p.kind === 'basket') {
         ctx.fillStyle = C.legs;
@@ -1087,7 +1102,7 @@
     const BURST_M = 1.8;
     const BURST_COL = { ball: C.gold, shield: C.chrome, magnet: C.gold, timeout: C.chrome, bak: C.gold };
     function drawBurst(it, state) {
-      const t = clamp((state.dist - it.z) / BURST_M, 0, 1);
+      const t = clamp((state.dist - (it.takenAt != null ? it.takenAt : it.z)) / BURST_M, 0, 1);
       const d = CAM_BACK, s = f / d;
       const x = ((state.x == null ? 1 : state.x) - 1) * LANE_W;
       const y = it.type === 'ball' ? (typeof it.y === 'number' ? it.y : (it.air ? 1.4 : 0.35)) : 0.6;
@@ -1280,7 +1295,7 @@
       const dead = state.alive === false;
 
       // korte herinneringen: landen (squash) en een bal pakken (forehand)
-      if (frame < prevFrame) { landAt = -99; swingAt = -99; prevBalls = state.balls || 0; }
+      if (frame < prevFrame) { landAt = -99; swingAt = -99; prevBalls = state.balls || 0; prevY = y; }
       if (frame !== prevFrame) {
         if (prevY > 0.05 && y <= 0.05) landAt = frame;
         if ((state.balls || 0) > prevBalls) swingAt = frame;
@@ -1646,7 +1661,7 @@
         const it = items[i];
         if (it.taken) {
           // net gepakt: nog even een sterretje en de punten bij de speler
-          const ago = dist - it.z;
+          const ago = dist - (it.takenAt != null ? it.takenAt : it.z);
           if (ago >= 0 && ago < BURST_M) list.push({ key: CAM_BACK - 0.05, it: null, burst: it });
           continue;
         }
@@ -1694,8 +1709,20 @@
       ctx.globalAlpha = 1;
 
       drawSpeed(state);
-      ctx.fillStyle = vignette;
-      ctx.fillRect(0, 0, W, H);
+      // vignet: één keer voorgerenderd, een radiale gradiënt over heel het scherm is duur op trage gsm's
+      const vk = W + 'x' + H + 'x' + dpr;
+      if (vigKey !== vk) {
+        vigKey = vk;
+        vigCanvas = makeCanvas(Math.round(W * dpr), Math.round(H * dpr));
+        if (vigCanvas) {
+          const vg = vigCanvas.getContext('2d');
+          vg.setTransform(dpr, 0, 0, dpr, 0, 0);
+          vg.fillStyle = vignette;
+          vg.fillRect(0, 0, W, H);
+        }
+      }
+      if (vigCanvas) ctx.drawImage(vigCanvas, 0, 0, W, H);
+      else { ctx.fillStyle = vignette; ctx.fillRect(0, 0, W, H); }
 
       if (state.alive === false) {
         ctx.fillStyle = 'rgba(200,36,42,0.28)';

@@ -126,7 +126,7 @@
         const hit = inLane && overlapZ && bottom < high + 0.3 && top > high - 0.3;
         const pulled = s.magnet > 0 && it.z + it.len > pz0 && it.z < s.dist + c.magnetReach;
         if (hit || pulled) {
-          it.taken = true; s.balls++;
+          it.taken = true; it.takenAt = s.dist; s.balls++;   // takenAt: enkel voor het beeld
           s.points += c.ballPoints * (s.bak > 0 ? 2 : 1);
           s.events.push('ball');
         }
