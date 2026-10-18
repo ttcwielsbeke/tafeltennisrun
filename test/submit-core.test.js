@@ -5,6 +5,7 @@ const R = require('../replay.js');
 const { bot } = require('./bot.js');
 const { createBoard } = require('../board.js');
 const core = require('../supabase/functions/submit-run/core.js');
+const CONFIG = require('../config.js');
 
 const { checkRequest, brusselsDate, tooFast, cleanName, MESSAGES } = core;
 const SECRET = 'ab'.repeat(32);
@@ -31,7 +32,7 @@ function record(seed) {
 function body(seed, over) {
   const r = record(seed);
   return Object.assign({
-    seed, name: 'Jo', secret: SECRET, version: 1,
+    seed, name: 'Jo', secret: SECRET, version: CONFIG.game.version,
     frames: r.frames, inputs: r.inputs, claimed: r.score, kit: 'club'
   }, over);
 }

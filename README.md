@@ -21,15 +21,16 @@ Open `index.html` of speel online (GitHub Pages, zie onder).
 
 - **Noppenspeler** (rood, PIPS OUT!) → wissel van baan. Over een speler spring je niet.
 - **Tafel** → spring erover. **Net** of **ballenmachine** → slide eronderdoor.
-- **Balletje** = 10 punten, elke meter = 1 punt.
+- **Balletje** = 5 punten, elke meter = 1 punt: ver lopen telt het zwaarst.
 - **Schild-bat** (blauw): je overleeft één botsing. **Magneet** (goud): 6 seconden lang komen de ballen naar jou.
 - **Time-out** (wit T-kaartje): 5 seconden trager lopen. **Ballenbak** (blauwe bak): 10 seconden dubbele punten per bal.
 - **Tenues**: met je beste score op dit toestel speel je nieuwe tenues vrij (Jeugdtrainer 300, Linkshandige 750,
   Groene noppen 1500, Clubkampioen 3000; dag- en oefenrondes tellen allebei). Kiezen doe je op het titelscherm
   met de pijltjes (of ←/→). Puur voor het oog: geen voordeel in het spel. De drempels staan in `config.js`.
-- Het wordt steeds moeilijker, zoals in Subway Surfers: de eerste 3 minuten versnel je van 10 naar 22 m/s, daarna
-  blijft het trager versnellen tot 30 m/s (~8 min). Na 3 minuten komen de rijen vlugger na elkaar, worden ze
-  gemengder, en komen er combinaties (springen en meteen sliden). Tussen twee rijen zit altijd minstens 0,9 s.
+- Het wordt steeds moeilijker, zoals in Subway Surfers: de eerste 2 minuten versnel je van 10 naar 22 m/s, daarna
+  blijft het trager versnellen tot 30 m/s (~6 min). Vanaf 2 minuten worden de rijen gemengder en komen ze vlugger
+  na elkaar; een volle rij tafels of netten komt dan altijd als combinatie (springen en meteen sliden, of omgekeerd).
+  Tussen twee rijen zit altijd minstens 0,9 s.
   Na een botsing: één tik op **Opnieuw**.
 - **Oefenen** gebruikt een willekeurige baan en telt niet mee voor de ranglijst.
 - Geluid staat standaard uit (knop rechtsboven); je keuze wordt onthouden. Alles is gesynthetiseerd: sneakerpiep
@@ -269,7 +270,7 @@ TTR_CONFIG = {
 - `TTR.MIN_ROW_GAP` (18 m) en `MIN_ROW_TIME` (0,9 s): twee rijen liggen minstens zoveel uit elkaar, de tijd gemeten
   bij de verwachte snelheid. Ook over de grens tussen twee stukken.
 - `TTR.expectedSpeed(z)` en `TTR.expectedTime(z)` — de snelheid en de tijd sinds de start op afstand `z`, uit
-  `config.js` (`v² = v0² + 2·a·z`, in twee fasen). De baan wordt daarmee na 3 minuten in tijd ingedeeld.
+  `config.js` (`v² = v0² + 2·a·z`, in twee fasen). De baan wordt daarmee na 2 minuten in tijd ingedeeld.
 - Bochten (enkel beeld, de banen blijven banen): `TTR.cornersOf(seed, index) → Corner[]` met
   `Corner = { z, len, dir: -1 | 1, angle }` (radialen), hoogstens één per stuk en volledig erbinnen.
   `TTR.curveAt(corners, z)` geeft de kromming (1/m), `TTR.headingAt(corners, z)` de totale draaiing.

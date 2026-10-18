@@ -41,13 +41,17 @@ test('een goede speler overleeft: de autopiloot haalt 3 minuten op 5 seeds', () 
   }
 });
 
-test('na 3 minuten versnelt het spel trager door, tot 30 m/s', () => {
+test('na 2 minuten versnelt het spel trager door, tot 30 m/s rond 6 minuten', () => {
   const s = G.createGame('x');
   s.items = []; s.nextChunk = 1e9;
   const at = (sec) => { while (s.frame < sec * 60) G.step(s, []); return s.speed; };
-  assert.ok(Math.abs(at(171.4) - 22) < 0.05);
-  assert.ok(at(300) > 25 && at(300) < 26.5);
-  assert.equal(at(700), 30);
+  assert.ok(Math.abs(at(120) - 22) < 0.05);        // kruissnelheid na 2 minuten
+  assert.ok(at(300) > 27.5 && at(300) < 28.5);
+  assert.equal(at(400), 30);                        // topsnelheid na ~6 minuten
+});
+
+test('een bal is 5 punten waard: afstand blijft de hoofdzaak', () => {
+  assert.equal(G.createGame('x').cfg.ballPoints, 5);
 });
 
 test('niets doen eindigt snel, maar niet meteen (eerste 40 m vrij)', () => {
@@ -120,6 +124,6 @@ test('de lus doet vaste stappen van 1/60 s, los van de beeldsnelheid', () => {
 // Gouden waarden: veranderen enkel als de spelregels, config.js of world.js veranderen.
 // Dan bewust opnieuw berekenen en hier aanpassen.
 const GOLDEN = {
-  script: { frame: 430, score: 73, alive: false, crashedBy: 'table' },   // onder het net door, dan tegen een tafel
-  bot: { frame: 7200, score: 2204, balls: 45, alive: true }
+  script: { frame: 426, score: 73, alive: false, crashedBy: 'table' },   // onder het net door, dan tegen een tafel
+  bot: { frame: 7200, score: 2210, balls: 53, alive: true }    // spelversie 2: sneller op snelheid, bal = 5
 };

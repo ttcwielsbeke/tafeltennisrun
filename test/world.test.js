@@ -156,9 +156,9 @@ test('kromming en draaiing kloppen: na de bocht is de hal precies angle gedraaid
 
 /* ---------- moeilijkheid die blijft stijgen ---------- */
 
-test('verwachte snelheid: 10 m/s bij de start, 22 na ~2,7 km, nooit boven 30', () => {
+test('verwachte snelheid: 10 m/s bij de start, 22 na ~1,9 km, nooit boven 30', () => {
   assert.equal(W.expectedSpeed(0), 10);
-  assert.ok(Math.abs(W.expectedSpeed(2743) - 22) < 0.05);
+  assert.ok(Math.abs(W.expectedSpeed(1920) - 22) < 0.05);     // kruissnelheid na ~2 min
   assert.ok(W.expectedSpeed(6000) > 22 && W.expectedSpeed(6000) < 30);
   assert.equal(W.expectedSpeed(20000), 30);
   for (let z = 0; z < 15000; z += 250) assert.ok(W.expectedSpeed(z + 250) >= W.expectedSpeed(z));
@@ -212,7 +212,8 @@ test('na 6 minuten: sneller, rijen dicht op elkaar en vaker gemengd dan na 2 min
     return { mixed, perSecond: inRange.length / ((z1 - z0) / W.expectedSpeed((z0 + z1) / 2)) };
   };
   for (const seed of SEEDS) {
-    const early = stats(seed, 1200, 2400), late = stats(seed, 9000, 12000);
+    // minuut 1-2 (0,6-1,5 km; kruissnelheid zit sinds versie 2 al op 1,9 km) tegen minuut 6-7
+    const early = stats(seed, 600, 1500), late = stats(seed, 9000, 12000);
     assert.ok(W.expectedSpeed(9000) > W.expectedSpeed(2400) * 1.2, 'niet sneller');
     assert.ok(late.perSecond > early.perSecond * 1.2, seed + ' niet drukker: ' + early.perSecond.toFixed(2) + ' → ' + late.perSecond.toFixed(2));
     assert.ok(late.mixed > early.mixed + 0.1, seed + ' niet gemengder: ' + early.mixed.toFixed(2) + ' → ' + late.mixed.toFixed(2));
@@ -232,4 +233,22 @@ test('laat in de run liggen de rijen niet allemaal op de minimale afstand', () =
     assert.ok(opDeVloer < 0.45, seed + ': ' + Math.round(opDeVloer * 100) + '% van de rijen op de vloer');
     assert.ok(tussen > 0.3, seed + ': te weinig variatie, ' + Math.round(tussen * 100) + '% tussen 0,92 en 1,2 s');
   }
+});
+
+test('laat in de run is een volle rij tafels of netten nooit meer gratis: altijd een combinatie', () => {
+  const lateFrom = 1920;   // vanaf ~2 minuten
+  let pairs = 0;
+  for (const seed of SEEDS) {
+    const rows = [];
+    for (let i = Math.floor(lateFrom / W.CHUNK_LEN) + 1; i < LATE; i++) rows.push(...W.rowsOf(W.generateChunk(seed, i)));
+    const full = (r) => r && r.lanes[0] === r.lanes[1] && r.lanes[1] === r.lanes[2] && (r.lanes[0] === 'table' || r.lanes[0] === 'net');
+    const opposite = (a, b) => full(a) && full(b) && a.lanes[0] !== b.lanes[0];
+    for (let k = 1; k < rows.length - 1; k++) {
+      if (!full(rows[k])) continue;
+      const paired = opposite(rows[k - 1], rows[k]) || opposite(rows[k], rows[k + 1]);
+      assert.ok(paired, seed + ': losse volle rij op z=' + rows[k].z);
+      pairs++;
+    }
+  }
+  assert.ok(pairs >= 20, 'te weinig combinaties: ' + pairs);
 });

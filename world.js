@@ -50,8 +50,8 @@
     if (z < p.z2) return t1 + (v - p.vc) / p.a2;
     return t1 + (p.vm - p.vc) / p.a2 + (z - p.z2) / p.vm;
   }
-  // 'laat' = 0 tot 3 minuten, dan oplopend tot 1 na 6 minuten: drukker, moeilijkere patronen, combinaties
-  function lateness(z) { return clamp01((expectedTime(z) - 180) / 180); }
+  // 'laat' = 0 tot 2 minuten, dan oplopend tot 1 na 5 minuten: drukker, moeilijkere patronen, combinaties
+  function lateness(z) { return clamp01((expectedTime(z) - 120) / 180); }
   // minimale afstand tussen rijen bij snelheid v (+0,15 m: afronding van z op 0,1 m)
   function minGap(v) { return Math.max(MIN_ROW_GAP, v * MIN_ROW_TIME + 0.15); }
   const round1 = (v) => Math.round(v * 10) / 10;
@@ -77,7 +77,8 @@
         } }
     ].filter((o) => d >= o.min);
     // later: minder losse noppenspelers, meer gemengde rijen
-    if (late > 0) for (const o of options) o.w *= o.min >= 0.2 ? 1 + 4 * late : o.min === 0 && o.w === 4 ? 1 - 0.6 * late : 1;
+    // (twee noppenspelers en gemengde rijen dwingen een keuze af; volle rijen worden later altijd een combinatie)
+    if (late > 0) for (const o of options) o.w *= o.min >= 0.1 ? 1 + 4 * late : o.w === 4 ? 1 - 0.6 * late : 1 - 0.3 * late;
     let total = 0;
     for (const o of options) total += o.w;
     let r = rng.next() * total;
@@ -154,6 +155,15 @@
       const lanes = forced ? [forced, forced, forced] : rowPattern(rng, d, late);
       const wasForced = !!forced;
       forced = null;
+      // laat in de run is een volle rij tafels of netten nooit gratis: meteen de omgekeerde erachter
+      // (combinatie). Past die tweede rij niet meer in dit stuk, dan maakt een noppenspeler in het
+      // midden er een keuze van.
+      let comboNext = null;
+      const full = lanes[0] === lanes[1] && lanes[1] === lanes[2] && (lanes[0] === 'table' || lanes[0] === 'net');
+      if (late > 0 && full && !wasForced) {
+        if (z + minGap(v) <= end - endHalf) comboNext = lanes[0] === 'table' ? 'net' : 'table';
+        else lanes[1] = 'nopper';
+      }
       // in een bocht hoogstens één noppenspeler: twee veilige banen, de bocht leest al moeilijk genoeg
       if (inCorner(corners, rowZ)) {
         let seen = 0;
@@ -166,13 +176,12 @@
       // afstand tot de volgende rij: eerst in meter zoals altijd, later in tijd bij de verwachte snelheid
       const r = rng.next();
       let gap = Math.max(MIN_ROW_GAP, lerp(30, 19, d) + r * lerp(14, 6, d));
-      // laat: 0,95..1,30 keer een doeltijd die van 0,95 s naar 0,85 s zakt (~0,81..1,11 s op het einde,
+      // laat: 0,95..1,30 keer een doeltijd die van 0,93 s naar 0,83 s zakt (~0,79..1,08 s op het einde,
       // gemiddeld ~1,0 s); de vloer van 0,9 s is het minimum, niet de regel
-      if (late > 0) gap = v * lerp(0.95, 0.85, late) * (0.95 + 0.35 * r);
+      if (late > 0) gap = v * lerp(0.93, 0.83, late) * (0.95 + 0.35 * r);
       // combinatie: springen en meteen sliden (of omgekeerd), op de kortste veilige afstand
-      const full = lanes[0] === lanes[1] && lanes[1] === lanes[2] && (lanes[0] === 'table' || lanes[0] === 'net');
-      if (late > 0 && full && !wasForced && rng.chance(0.15 + 0.6 * late)) {
-        forced = lanes[0] === 'table' ? 'net' : 'table';
+      if (comboNext) {
+        forced = comboNext;
         gap = 0;
       }
       gap = Math.max(gap, minGap(v));
