@@ -12,14 +12,13 @@
       /* 'local'    = ieder zijn eigen lijst, op zijn eigen toestel.
          'supabase' = één gedeelde dagranglijst voor heel de club.
 
-         Zolang url en key leeg zijn, of de tabel nog niet bestaat,
-         valt het spel gewoon terug op 'local'. De SQL voor de tabel
-         staat in supabase/runner_scores.sql en in README.md.          */
+         Zolang url en key leeg zijn, of de tabellen nog niet bestaan,
+         valt het spel gewoon terug op 'local'. De SQL voor de tabellen
+         staat in supabase/runner_v2.sql (zie README.md).              */
       provider: 'supabase',
 
       url: 'https://aqaikstibteqcdgxtuiw.supabase.co',      // Project URL (zelfde project als PIPS OUT!)
       key: 'sb_publishable_yt1HRtTr-Z8WCiZv3_uCkQ_on2j5ZJ4',  // de anon public key (die hoort publiek te zijn)
-      table: 'runner_scores',
 
       limit: 25     // hoeveel spelers in de dagranglijst
     },

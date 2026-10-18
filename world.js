@@ -14,15 +14,22 @@
 
   const CFG = (root.TTR_CONFIG && root.TTR_CONFIG.game) ||
     (typeof require === 'function' ? require('./config.js').game : {});
-  const MIN_ROW_TIME = 0.9;   // seconden tussen twee rijen, minstens: langer dan een sprong (0,82 s)
+  // seconden tussen twee rijen, minstens, bij de verwachte snelheid. Langer dan een sprong (0,82 s):
+  // de 0,08 s marge vangt ook op dat wie time-outs nam iets sneller loopt dan verwacht (zie hieronder).
+  const MIN_ROW_TIME = 0.9;
 
   const lerp = (a, b, t) => a + (b - a) * t;
   const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
   /* ---------- verwachte snelheid op afstand z ----------
-     De snelheid hangt enkel van de afstand af (een time-out maakt het alleen
-     makkelijker): v² = v0² + 2·a·z, eerst met accel tot cruiseSpeed, dan met
-     lateAccel tot maxSpeed. Math.sqrt is exact afgerond (IEEE 754): overal gelijk. */
+     Zonder time-outs hangt de snelheid enkel van de afstand af: v² = v0² + 2·a·z,
+     eerst met accel tot cruiseSpeed, dan met lateAccel tot maxSpeed.
+     De onderliggende snelheid groeit per seconde, niet per meter. Tijdens een
+     time-out loop je trager maar versnelt ze gewoon door: wie time-outs nam, komt
+     later op een plek z en loopt daar dus sneller dan expectedSpeed(z) (gemeten
+     tot ~0,5 m/s). De rijen komen dan iets vlugger; de marge tussen MIN_ROW_TIME
+     (0,9 s) en een sprong (0,82 s) vangt dat op.
+     Math.sqrt is exact afgerond (IEEE 754): overal gelijk. */
   function speedPhases() {
     const v0 = CFG.startSpeed, a1 = CFG.accel, vc = CFG.cruiseSpeed, a2 = CFG.lateAccel, vm = CFG.maxSpeed;
     const z1 = (vc * vc - v0 * v0) / (2 * a1);
@@ -159,7 +166,8 @@
       // afstand tot de volgende rij: eerst in meter zoals altijd, later in tijd bij de verwachte snelheid
       const r = rng.next();
       let gap = Math.max(MIN_ROW_GAP, lerp(30, 19, d) + r * lerp(14, 6, d));
-      if (late > 0) gap = v * lerp(1.0, 0.82, late) * (0.85 + 0.3 * r);
+      // laat: 0,95..1,30 keer de doeltijd, die van 1,0 s naar 0,9 s zakt; de vloer is het minimum, niet de regel
+      if (late > 0) gap = v * lerp(1.0, 0.9, late) * (0.95 + 0.35 * r);
       // combinatie: springen en meteen sliden (of omgekeerd), op de kortste veilige afstand
       const full = lanes[0] === lanes[1] && lanes[1] === lanes[2] && (lanes[0] === 'table' || lanes[0] === 'net');
       if (late > 0 && full && !wasForced && rng.chance(0.15 + 0.6 * late)) {

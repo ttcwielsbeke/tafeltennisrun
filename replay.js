@@ -63,7 +63,7 @@
       const acts = [];
       while (i < inputs.length && inputs[i][0] === s.frame) acts.push(inputs[i++][1]);
       TTR.step(s, acts);
-      for (const e of s.events) if (e in c) c[e]++;
+      for (const e of s.events) if (Object.prototype.hasOwnProperty.call(c, e)) c[e]++;   // enkel eigen tellers, nooit iets van Object.prototype
     }
     const ok = !s.alive && s.frame === frames;
     return result(ok, ok ? undefined : 'nocrash', s, c);

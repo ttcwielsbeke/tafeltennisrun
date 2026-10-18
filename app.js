@@ -25,7 +25,7 @@
   let recorder = null;        // legt de invoer van een dagrun vast (null bij een oefenronde)
   let pendingRun = null;      // de afgeronde dagrun, klaar om (met een naam erbij) in te sturen
   let lastRun = null;         // het laatst verstuurde pakket, voor TTR.debug.lastRun
-  let overToken = 0;          // telt de game-overs: een laat antwoord op een oude run telt niet meer
+  let overToken = 0;          // stijgt bij elke game-over, start en terugkeer: een laat antwoord op een oude run telt niet meer
 
   const NAME_LABEL = 'Je naam voor de ranglijst';
   const CRASH = {
@@ -96,6 +96,7 @@
     milestone = 0;
     recorder = practice ? null : TTR.createRecorder();
     pendingRun = null;
+    overToken++;                 // een laat antwoord op de vorige run tekent niets meer
     show(null);
     audio.startAmbience();
     canvas.focus && canvas.focus();
@@ -321,7 +322,7 @@
   $('btn-again').addEventListener('click', () => start(practice));
   $('btn-resume').addEventListener('click', resume);
   $('btn-pause').addEventListener('click', () => (mode === 'run' ? pause() : resume()));
-  function home() { mode = 'start'; browse = skin; showSkin(); show('start'); showBest(); }
+  function home() { overToken++; mode = 'start'; browse = skin; showSkin(); show('start'); showBest(); }
   $('btn-quit').addEventListener('click', home);
   $('btn-board').addEventListener('click', () => openBoard('day'));
   $('btn-board-over').addEventListener('click', () => openBoard('all'));

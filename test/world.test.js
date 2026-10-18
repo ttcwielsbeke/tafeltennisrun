@@ -185,7 +185,8 @@ test('later wordt het drukker: kortere tijd tussen rijen en combinatierijen', ()
   };
   for (const seed of SEEDS) {
     assert.ok(meanDt(seed, 1, 6) > 1.8, seed + ' begin te druk');
-    assert.ok(meanDt(seed, 60, 90) < 1.1, seed + ' einde niet druk genoeg');
+    // de laatste rijen variëren tussen 0,9 en ~1,2 s (gemiddeld ~1,1 s, met de stukgrenzen erbij)
+    assert.ok(meanDt(seed, 60, 90) < 1.2, seed + ' einde niet druk genoeg');
   }
   let combos = 0;
   for (const seed of SEEDS) {
@@ -214,7 +215,21 @@ test('na 6 minuten: sneller, rijen dicht op elkaar en vaker gemengd dan na 2 min
   for (const seed of SEEDS) {
     const early = stats(seed, 1200, 2400), late = stats(seed, 9000, 12000);
     assert.ok(W.expectedSpeed(9000) > W.expectedSpeed(2400) * 1.2, 'niet sneller');
-    assert.ok(late.perSecond > early.perSecond * 1.2, seed + ' niet drukker: ' + early.perSecond.toFixed(2) + ' → ' + late.perSecond.toFixed(2));
+    assert.ok(late.perSecond > early.perSecond * 1.05, seed + ' niet drukker: ' + early.perSecond.toFixed(2) + ' → ' + late.perSecond.toFixed(2));
     assert.ok(late.mixed > early.mixed + 0.1, seed + ' niet gemengder: ' + early.mixed.toFixed(2) + ' → ' + late.mixed.toFixed(2));
+  }
+});
+
+// De vloer van 0,9 s is het minimum, niet de regel: laat in de run variëren de rijen nog.
+test('laat in de run liggen de rijen niet allemaal op de minimale afstand', () => {
+  for (const seed of SEEDS) {
+    const rows = [];
+    for (let i = 60; i < 90; i++) rows.push(...W.rowsOf(W.generateChunk(seed, i)));
+    const dts = [];
+    for (let k = 1; k < rows.length; k++) dts.push((rows[k].z - rows[k - 1].z) / W.expectedSpeed(rows[k - 1].z));
+    const opDeVloer = dts.filter((dt) => dt < 0.92).length / dts.length;
+    const ruim = dts.filter((dt) => dt > 1.1).length / dts.length;
+    assert.ok(opDeVloer < 0.4, seed + ': ' + Math.round(opDeVloer * 100) + '% van de rijen op de vloer');
+    assert.ok(ruim > 0.3, seed + ': te weinig variatie, ' + Math.round(ruim * 100) + '% boven 1,1 s');
   }
 });

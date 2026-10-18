@@ -94,3 +94,24 @@ test('recorder laat pauze vallen', () => {
   rec.add(5, ['pause', 'jump']);
   assert.deepEqual(rec.inputs, [[5, 'jump']]);
 });
+
+test('tellers: enkel eigen tellers, niets van Object.prototype', () => {
+  // een event met een naam die enkel via het prototype bestaat, mag nergens geteld worden
+  let geraakt = false;
+  Object.defineProperty(Object.prototype, 'testTeller', {
+    configurable: true,
+    get() { return 0; },
+    set() { geraakt = true; }
+  });
+  const step = globalThis.TTR.step;
+  globalThis.TTR.step = (s, acts) => { step(s, acts); s.events.push('testTeller'); };
+  try {
+    const { s, rec } = record(SEEDS[0]);
+    const r = R.replay(SEEDS[0], s.frame, rec.inputs);
+    assert.equal(r.ok, true);
+    assert.equal(geraakt, false, 'een prototype-eigenschap werd als teller gebruikt');
+  } finally {
+    globalThis.TTR.step = step;
+    delete Object.prototype.testTeller;
+  }
+});
