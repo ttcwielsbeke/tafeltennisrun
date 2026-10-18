@@ -83,6 +83,21 @@
         .slice(0, limit)
         .map(function (r) { return { name: r.name, score: r.score, created_at: r.created_at }; });
     }
+    // rijen staan al op score, hoogste eerst: per naam (hoofdletters tellen niet) de eerste houden
+    function bestPerName(rows) {
+      const seen = {};
+      return rows.filter(function (r) {
+        const k = String(r.name).toLowerCase();
+        if (seen[k]) return false;
+        seen[k] = true;
+        return true;
+      });
+    }
+    function localAllTime() {
+      return bestPerName(readLocal().sort(function (a, b) { return b.score - a.score; }))
+        .slice(0, limit)
+        .map(function (r) { return { name: r.name, score: r.score, seed: r.seed }; });
+    }
     function localBest() {
       const rows = readLocal().sort(function (a, b) { return b.score - a.score; });
       const r = rows[0];
@@ -146,6 +161,19 @@
           } catch (_) { /* valt terug op lokaal */ }
         }
         return { row: localBest(), source: 'local' };
+      },
+
+      /* aller tijden: per speler zijn beste score. {rows:[{name,score,seed}], source}
+         Supabase kent geen "beste per naam" zonder view, dus halen we ruim op en
+         houden we zelf per naam de eerste (= beste) rij. */
+      async allTime() {
+        if (remote) {
+          try {
+            const rows = await getRows('?select=name,score,seed&order=score.desc&limit=' + limit * 8);
+            return { rows: bestPerName(rows).slice(0, limit), source: 'supabase' };
+          } catch (_) { /* valt terug op lokaal */ }
+        }
+        return { rows: localAllTime(), source: 'local' };
       },
 
       /* {ok, source, error?} — bewaart altijd eerst lokaal */

@@ -46,6 +46,7 @@
         <span class="pc">Pijltjes of A/D/W/S &middot; spatie = springen &middot; P = pauze</span>
       </p>
       <button id="btn-start" class="big" type="button">Start</button>
+      <button id="btn-board" class="mid" type="button">&#127942; Ranglijst</button>
       <button id="btn-practice" class="small" type="button">Oefenen (telt niet mee)</button>
       <p class="seed">Baan van vandaag: <b id="seed-today"></b></p>
       <p class="best" id="best-ever"></p>
@@ -82,7 +83,23 @@
         <ol id="board-list"></ol>
         <p class="sub" id="board-note"></p>
       </div>
+      <button id="btn-board-over" class="mid" type="button">&#127942; Ook aller tijden</button>
       <button id="btn-home" class="small" type="button">Naar het begin</button>
+    </section>
+
+    <!-- ranglijsten: vandaag en aller tijden -->
+    <section id="screen-board" class="panel over" data-ui hidden>
+      <h2>Ranglijst</h2>
+      <div class="tabs" role="tablist" aria-label="Welke ranglijst">
+        <button id="tab-day" role="tab" type="button" aria-selected="true" aria-controls="rank-list">Vandaag</button>
+        <button id="tab-all" role="tab" type="button" aria-selected="false" aria-controls="rank-list">Aller tijden</button>
+      </div>
+      <div class="board">
+        <h3 id="rank-title"></h3>
+        <ol id="rank-list" role="tabpanel"></ol>
+        <p class="sub" id="rank-note"></p>
+      </div>
+      <button id="btn-board-back" class="big" type="button">Terug</button>
     </section>
   </main>
 

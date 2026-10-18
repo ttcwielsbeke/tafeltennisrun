@@ -149,6 +149,17 @@ h3{ font-size:10px; font-weight:400; margin:14px 0 8px; color:var(--chrome); }
   margin:8px 0;
 }
 .big:active{ transform:translateY(2px); box-shadow:0 2px 0 var(--red-dark), 0 0 0 3px var(--ink); }
+.mid{
+  display:block; width:100%;
+  padding:10px;
+  border:2px solid var(--chrome); border-radius:12px;
+  background:rgba(2,19,43,.45);
+  color:#fff;
+  font-family:var(--px);
+  font-size:11px;
+  margin:4px 0 2px;
+}
+.mid:active{ transform:translateY(1px); }
 .small{
   background:none; border:0;
   color:var(--chrome);
@@ -190,3 +201,14 @@ form button{
 .board li .s{ color:var(--gold); }
 .board li.me{ background:rgba(255,210,63,.18); border-radius:6px; }
 .board li.empty::before{ content:""; width:0; }
+
+/* ranglijst-scherm: tabs vandaag / aller tijden */
+.tabs{ display:flex; gap:6px; margin:4px 0 2px; }
+.tabs button{
+  flex:1; padding:9px 6px;
+  border:2px solid var(--chrome); border-radius:10px;
+  background:transparent; color:var(--chrome);
+  font-family:var(--px); font-size:9px;
+}
+.tabs button[aria-selected="true"]{ background:var(--chrome); color:var(--ink); }
+.board li .d{ color:#8aa6c8; font-size:7px; align-self:center; }

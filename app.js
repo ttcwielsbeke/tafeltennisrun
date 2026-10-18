@@ -14,8 +14,9 @@
   if (/[?&]lokaal(&|=|$)/.test(location.search)) boardCfg.provider = 'local';
   const board = TTR.createBoard(boardCfg);
 
-  const screens = { start: $('screen-start'), pause: $('screen-pause'), over: $('screen-over') };
-  let mode = 'start';          // 'start' | 'run' | 'pause' | 'over'
+  const screens = { start: $('screen-start'), pause: $('screen-pause'), over: $('screen-over'),
+                    board: $('screen-board') };
+  let mode = 'start';          // 'start' | 'run' | 'pause' | 'over' | 'board'
   let practice = false;
   let game = TTR.createGame(TTR.dailySeed());
   let queue = [];
@@ -166,29 +167,79 @@
     loadBoard(seed, { name, score });
   }
 
-  async function loadBoard(seed, mine) {
-    const list = $('board-list');
-    $('board-title').textContent = 'Ranglijst TTC Wielsbeke-Spotit · ' + seed;
-    $('board-note').textContent = 'Laden…';
-    const { rows, source } = await board.top(seed);
+  // rijen in een <ol>; is(r) zegt welke rij van jou is (enkel de eerste wordt gemarkeerd)
+  function fillList(list, rows, is, empty, withSeed) {
     list.textContent = '';
     let marked = false;
     for (const r of rows) {
       const li = document.createElement('li');
       const n = document.createElement('span'); n.className = 'n'; n.textContent = r.name;
       const s = document.createElement('span'); s.className = 's'; s.textContent = r.score;
-      li.append(n, s);
-      if (mine && !marked && r.name === mine.name && r.score === mine.score) { li.className = 'me'; marked = true; }
+      li.append(n);
+      if (withSeed) { const d = document.createElement('span'); d.className = 'd'; d.textContent = r.seed; li.append(d); }
+      li.append(s);
+      if (!marked && is(r)) { li.className = 'me'; marked = true; }
       list.append(li);
     }
     if (!rows.length) {
       const li = document.createElement('li'); li.className = 'empty';
-      li.textContent = 'Nog niemand van de club vandaag. Jij eerst!';
+      li.textContent = empty;
       list.append(li);
     }
-    $('board-note').textContent = source === 'supabase' ? 'Clubranking: top ' + rows.length
+  }
+  function sourceNote(source, n) {
+    return source === 'supabase' ? 'Clubranking: top ' + n
       : 'Lijst van dit toestel (geen verbinding met de clubranking).';
+  }
+
+  async function loadBoard(seed, mine) {
+    $('board-title').textContent = 'Ranglijst TTC Wielsbeke-Spotit · ' + seed;
+    $('board-note').textContent = 'Laden…';
+    const { rows, source } = await board.top(seed);
+    fillList($('board-list'), rows, (r) => !!mine && r.name === mine.name && r.score === mine.score,
+      'Nog niemand van de club vandaag. Jij eerst!', false);
+    $('board-note').textContent = sourceNote(source, rows.length);
     showBest();
+  }
+
+  /* ---------- ranglijst-scherm: vandaag en aller tijden ---------- */
+  let boardFrom = 'start', boardTab = 'day', boardReq = 0;
+  function openBoard(tab) {
+    boardFrom = mode === 'over' ? 'over' : 'start';
+    mode = 'board';
+    show('board');
+    showTab(tab);
+    $(tab === 'all' ? 'tab-all' : 'tab-day').focus();
+  }
+  function closeBoard() {
+    if (mode !== 'board') return;
+    mode = boardFrom;
+    show(boardFrom);
+    if (boardFrom === 'start') showBest();
+    $(boardFrom === 'over' ? 'btn-board-over' : 'btn-board').focus();
+  }
+  async function showTab(tab) {
+    boardTab = tab;
+    const req = ++boardReq;     // trager antwoord van de vorige tab mag niets overschrijven
+    $('tab-day').setAttribute('aria-selected', String(tab === 'day'));
+    $('tab-all').setAttribute('aria-selected', String(tab === 'all'));
+    const today = TTR.dailySeed();
+    $('rank-title').textContent = tab === 'day' ? 'Baan van vandaag · ' + today : 'Beste score per speler, ooit';
+    $('rank-note').textContent = 'Laden…';
+    $('rank-list').textContent = '';
+    let res;
+    try {
+      res = tab === 'day' ? await board.top(today) : await board.allTime();
+    } catch (e) {
+      // bv. een oude board.js uit de cache van de browser, vlak na een update
+      if (req === boardReq) $('rank-note').textContent = 'Kon de ranglijst niet laden. Herlaad de pagina even.';
+      return;
+    }
+    if (req !== boardReq || mode !== 'board') return;
+    const me = board.getName().toLowerCase();
+    fillList($('rank-list'), res.rows, (r) => !!me && String(r.name).toLowerCase() === me,
+      tab === 'day' ? 'Nog niemand van de club vandaag. Jij eerst!' : 'Nog geen scores.', tab === 'all');
+    $('rank-note').textContent = sourceNote(res.source, res.rows.length);
   }
 
   async function showBest() {
@@ -205,6 +256,9 @@
       if (a === 'pause' || a === 'jump') resume();
     } else if (mode === 'over') {
       if (a === 'jump' && performance.now() - overAt > 400) start(practice);
+    } else if (mode === 'board') {
+      if (a === 'pause') closeBoard();
+      else if (a === 'left' || a === 'right') showTab(a === 'left' ? 'day' : 'all');
     } else if (mode === 'start') {
       if (a === 'jump') start(false);
       else if (a === 'left' || a === 'right') nextSkin(a === 'left' ? -1 : 1);
@@ -219,6 +273,11 @@
   $('btn-pause').addEventListener('click', () => (mode === 'run' ? pause() : resume()));
   function home() { mode = 'start'; browse = skin; showSkin(); show('start'); showBest(); }
   $('btn-quit').addEventListener('click', home);
+  $('btn-board').addEventListener('click', () => openBoard('day'));
+  $('btn-board-over').addEventListener('click', () => openBoard('all'));
+  $('btn-board-back').addEventListener('click', closeBoard);
+  $('tab-day').addEventListener('click', () => showTab('day'));
+  $('tab-all').addEventListener('click', () => showTab('all'));
   $('btn-home').addEventListener('click', home);
   $('skin-prev').addEventListener('click', (e) => { nextSkin(-1); e.currentTarget.blur(); });
   $('skin-next').addEventListener('click', (e) => { nextSkin(1); e.currentTarget.blur(); });

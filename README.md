@@ -34,6 +34,8 @@ Open `index.html` of speel online (GitHub Pages, zie onder).
 Bij je eerste score vraagt het spel je naam (max. 16 tekens); die wordt onthouden op je toestel.
 Daarna gaat elke score van de dagbaan vanzelf naar de ranglijst: de top 25 van vandaag, plus
 "beste ooit" op het titelscherm.
+De knop **Ranglijst** (op het titelscherm en na een run) toont twee lijsten: **Vandaag** (de top 25
+van de dagbaan) en **Aller tijden** (per speler zijn beste score ooit, met de datum).
 
 ## Lokaal draaien
 
@@ -56,6 +58,7 @@ node --test
 - `test/world.test.js`: zelfde seed geeft dezelfde baan en bochten, elke rij en elke bocht heeft een veilige route, rijen liggen ver genoeg uit elkaar.
 - `test/game.test.js`: een vaste seed met een vast invoerscript en een autopiloot (`test/bot.js`) geven altijd dezelfde score; schild, magneet, time-out, ballenbak, besturing en de vaste-stap-lus.
 - `test/skins.test.js`: welke tenues bij welke beste score horen, en dat elk tenue een tekening heeft.
+- `test/board.test.js`: de ranglijst aller tijden houdt per speler de beste score, ook via Supabase, met terugval op lokaal.
 
 Pas je `config.js` of `world.js` aan, dan veranderen de "gouden" scores in `test/game.test.js`. Dat is de bedoeling: bereken ze opnieuw en pas ze bewust aan.
 
@@ -226,6 +229,7 @@ TTR_CONFIG = {
 - `TTR.createBoard(cfg = TTR_CONFIG.board, storage = localStorage, fetchFn = fetch) → Board`
 - `board.top(seed) → Promise<{ rows: {name, score, created_at}[], source: 'supabase'|'local' }>` (top 25)
 - `board.best() → Promise<{ row: {name, score, seed} | null, source }>` (beste ooit)
+- `board.allTime() → Promise<{ rows: {name, score, seed}[], source }>` — aller tijden, per speler (naam zonder hoofdletters) enkel de beste score, top 25.
 - `board.submit({ name, score, seed }) → Promise<{ ok: bool, source }>` — bewaart altijd ook lokaal.
 - `board.getName() / board.setName(name)` — onthouden in `localStorage`.
 - Valt stil terug op `localStorage` als url/key leeg zijn of Supabase niet antwoordt.
