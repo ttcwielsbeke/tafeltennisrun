@@ -46,6 +46,8 @@
   /* tenues, zoals in ULTRA SMASH! */
   const CLUB = { shirt: '#161616', trim: '#f4f4f4', hem: '#0a0a0a', shorts: '#111111',
                  stripes: ['#e4474c', '#c6a743', '#2eb1c2'] };
+  /* de chopper: verdediger in wit met blauw, lange (zwarte) noppen */
+  const CHOP = { shirt: '#f2f4f7', trim: '#1a5ca8', shorts: '#1c2430', pips: ['#9aa3ad', '#3a3f47', '#111111'], bat: '#1b1d22' };
   const PIPS = { shirt: '#c8242a', trim: '#8d1519', hem: '#8d1519', shorts: '#1c2430',
                  pips: ['#f0716a', '#d94a44', '#8b1a1f'], bat: '#c8242a' };
   /* vrij te spelen tenues van de speler (drempels in config.js) */
@@ -439,7 +441,7 @@
       ctx.closePath();
     }
 
-    function drawFloor(dist) {
+    function drawFloor(dist, state) {
       const dNear = Math.max(NEAR, camH * f / (H - hy) * 0.9);
       const dFar = VIEW_AHEAD + CAM_BACK + 10;
       // dwarse parketbanden
@@ -512,6 +514,7 @@
       ctx.fill();
 
       drawReflections();
+      drawBossFloor(state);
 
       // omheining langs de baan (rood/blauw), schuift mee
       const seg = 2.5, blen = 2.2, bh = 0.6;
@@ -833,6 +836,218 @@
 
     /* noppenspeler in PIPS OUT!-tenue, kijkt naar de speler en wacht in
        klaarstand: door de knieën, wippend op de voorvoeten */
+    /* chopper: de verdediger. Hij staat in it.from en schuift naar it.lane (zijn eindbaan) als je
+       nog it.moveAt meter weg bent; vlak daarvoor helt hij al over (dat zie je aankomen). */
+    function chopperX(it, dist) {
+      const dz = it.z - dist;
+      const a = (it.from - 1) * LANE_W, b = (it.lane - 1) * LANE_W;
+      if (dz >= it.moveAt) return { x: a, lean: clamp((it.moveAt + it.moveLen * 0.8 - dz) / (it.moveLen * 0.8), 0, 1) * Math.sign(b - a), moving: false };
+      if (dz <= it.moveAt - it.moveLen) return { x: b, lean: 0, moving: false };
+      const t = (it.moveAt - dz) / it.moveLen, e = t * t * (3 - 2 * t);
+      return { x: a + (b - a) * e, lean: Math.sign(b - a), moving: true };
+    }
+
+    function drawChopper(item, d, frame, dist) {
+      const s = f / d;
+      const pos = chopperX(item, dist);
+      ctx.save();
+      ctx.translate(sx(pos.x, d), sy(0, d));
+      ctx.scale(s, s);
+      if (item.broken) { ctx.globalAlpha *= 0.35; ctx.rotate(0.6); }
+      shadow(0.45);
+      if (pos.moving) {
+        // stof bij het opschuiven
+        for (let i = 0; i < 4; i++) {
+          const t = (frame * 0.12 + i / 4) % 1;
+          ctx.fillStyle = 'rgba(245,225,200,' + (0.4 * (1 - t)).toFixed(3) + ')';
+          ctx.beginPath(); ctx.arc(-pos.lean * (0.2 + t * 0.4), -0.05 - t * 0.15, 0.05 + t * 0.07, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+      ctx.rotate(pos.lean * 0.18);
+      const seed = item.z * 1.3 + item.lane;
+      const bob = Math.abs(Math.sin(frame * 0.14 + seed)) * 0.03;
+      ctx.translate(0, -bob);
+      // laag door de knieën: verdedigers staan ver en diep
+      for (const side of [-1, 1]) {
+        limb(side * 0.13, -0.74, side * 0.26, -0.4, 0.15, C.skin);
+        limb(side * 0.26, -0.4, side * 0.2, -0.12 + bob, 0.12, C.skin);
+        limb(side * 0.2, -0.16 + bob, side * 0.2, -0.06 + bob, 0.13, C.white);
+        ctx.fillStyle = OUTLINE;
+        roundRect(side * 0.2 - 0.1, -0.08 + bob, 0.2, 0.11, 0.04); ctx.fill();
+        ctx.fillStyle = '#e8e8e8';
+        roundRect(side * 0.2 - 0.085, -0.07 + bob, 0.17, 0.08, 0.03); ctx.fill();
+      }
+      ctx.fillStyle = CHOP.shorts;
+      roundRect(-0.26, -0.9, 0.52, 0.28, 0.05); ctx.fill();
+      ctx.strokeStyle = OUTLINE; ctx.lineWidth = 0.03; ctx.stroke();
+      // vrije arm
+      limb(-0.3, -1.3, -0.46, -1.02, 0.11, C.skin);
+      limb(-0.46, -1.02, -0.3, -0.92, 0.1, C.skin);
+      // shirt: wit met blauwe zijbanen
+      roundRect(-0.29, -1.4, 0.58, 0.56, 0.07);
+      ctx.fillStyle = CHOP.shirt; ctx.fill();
+      ctx.strokeStyle = OUTLINE; ctx.lineWidth = 0.03; ctx.stroke();
+      ctx.fillStyle = CHOP.trim;
+      ctx.fillRect(-0.29, -1.36, 0.07, 0.48); ctx.fillRect(0.22, -1.36, 0.07, 0.48);
+      ctx.fillRect(-0.12, -1.4, 0.24, 0.04);
+      // hoofd
+      ctx.fillStyle = C.skin;
+      ctx.fillRect(-0.05, -1.5, 0.1, 0.1);
+      ctx.fillStyle = OUTLINE;
+      ctx.beginPath(); ctx.arc(0, -1.58, 0.165, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = C.skin;
+      ctx.beginPath(); ctx.arc(0, -1.58, 0.15, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#6b4a2b';
+      ctx.beginPath(); ctx.arc(0, -1.62, 0.15, Math.PI, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = C.blue;                                   // zweetband
+      ctx.fillRect(-0.15, -1.66, 0.3, 0.04);
+      ctx.fillStyle = '#111';
+      ctx.fillRect(-0.07, -1.58, 0.035, 0.035);
+      ctx.fillRect(0.035, -1.58, 0.035, 0.035);
+      // batarm laag: de chop, het bat zwiept rustig op en neer
+      const chopA = Math.sin(frame * 0.1 + seed) * 0.25;
+      limb(0.3, -1.3, 0.46, -1.05, 0.11, C.skin);
+      limb(0.46, -1.05, 0.5, -0.82, 0.1, C.skin);
+      ctx.save();
+      ctx.translate(0.5, -0.82);
+      ctx.rotate(0.6 + chopA);
+      ctx.fillStyle = OUTLINE; ctx.fillRect(-0.045, -0.02, 0.09, 0.22);
+      ctx.fillStyle = '#8a5a2b'; ctx.fillRect(-0.035, -0.01, 0.07, 0.2);
+      ctx.fillStyle = '#000';
+      ctx.beginPath(); ctx.ellipse(0, 0.42, 0.24, 0.27, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = CHOP.bat;
+      ctx.beginPath(); ctx.ellipse(0, 0.42, 0.215, 0.245, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.save();
+      ctx.beginPath(); ctx.ellipse(0, 0.42, 0.215, 0.245, 0, 0, Math.PI * 2); ctx.clip();
+      drawPips(-0.22, 0.17, 0.44, 0.5, 0.06, CHOP.pips, s);   // lange noppen
+      ctx.restore();
+      ctx.restore();
+      ctx.restore();
+    }
+
+    /* ---------- de clubkampioen: een gouden poort om de 1000 m ---------- */
+    const BOSS_LIT = 90;   // zoveel meter voor de poort licht de vloer goud op
+    function bossStart(state, k, at) {
+      let first = at - BOSS_LIT;
+      for (const it of state.items || []) if (it.boss === k && it.z < first + BOSS_LIT && it.z > at - 400) first = Math.min(first, it.z - 8);
+      return first;
+    }
+    function drawBossFloor(state) {
+      const every = (root.TTR && root.TTR.BOSS_EVERY) || 1000;
+      const dist = state.dist || 0;
+      for (let k = Math.max(1, Math.ceil((dist - 5) / every)); k * every <= dist + VIEW_AHEAD; k++) {
+        const at = k * every, from = bossStart(state, k, at);
+        const da = Math.max(NEAR + 0.5, from - camZ), db = at - camZ;
+        if (db <= da) continue;
+        ctx.fillStyle = 'rgba(255,210,63,0.18)';
+        ctx.beginPath(); stripFloor(-COURT_X, COURT_X, da, db); ctx.fill();
+      }
+    }
+    function addBosses(state) {
+      const every = (root.TTR && root.TTR.BOSS_EVERY) || 1000;
+      const dist = state.dist || 0;
+      for (let k = Math.max(1, Math.ceil((dist - 3) / every)); k * every <= dist + VIEW_AHEAD; k++) {
+        const at = k * every;
+        if (at - camZ < NEAR + 1) continue;
+        list.push({ key: at - camZ, it: null, boss: { k, at } });
+      }
+    }
+    function drawBoss(b, frame, dist) {
+      const d = b.at - camZ, s = f / d;
+      const px = BARRIER_X + 0.5, top = 4.3;
+      ctx.save();
+      // pilaren
+      for (const side of [-1, 1]) {
+        const x = side * px;
+        ctx.fillStyle = OUTLINE;
+        ctx.fillRect(sx(x, d) - 0.2 * s, sy(top, d), 0.4 * s, sy(0, d) - sy(top, d));
+        ctx.fillStyle = C.gold;
+        ctx.fillRect(sx(x, d) - 0.16 * s, sy(top, d), 0.32 * s, sy(0, d) - sy(top, d));
+        ctx.fillStyle = 'rgba(255,255,255,0.35)';
+        ctx.fillRect(sx(x, d) - 0.12 * s, sy(top, d), 0.06 * s, sy(0, d) - sy(top, d));
+      }
+      // balk met de naam
+      const x0 = sx(-px, d), x1 = sx(px, d), y0 = sy(top, d), y1 = sy(top - 0.8, d);
+      ctx.fillStyle = OUTLINE; ctx.fillRect(x0 - 0.2 * s, y0 - 0.06 * s, x1 - x0 + 0.4 * s, y1 - y0 + 0.12 * s);
+      ctx.fillStyle = C.ink; ctx.fillRect(x0 - 0.16 * s, y0, x1 - x0 + 0.32 * s, y1 - y0);
+      ctx.fillStyle = C.gold;
+      ctx.fillRect(x0 - 0.16 * s, y0, x1 - x0 + 0.32 * s, 0.07 * s);
+      ctx.fillRect(x0 - 0.16 * s, y1 - 0.07 * s, x1 - x0 + 0.32 * s, 0.07 * s);
+      const fs = Math.round((y1 - y0) * 0.42);
+      if (fs >= 5) {
+        ctx.font = fs + 'px ' + HUD_FONT;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillStyle = C.gold;
+        ctx.fillText('CLUBKAMPIOEN', (x0 + x1) / 2, (y0 + y1) / 2 + fs * 0.08, x1 - x0);
+      }
+      // de kampioen op een podium naast de poort, met gebalde vuist
+      const cx2 = px + 1.4, dd = d - 1.5, ss = f / dd;
+      ctx.translate(sx(cx2, dd), sy(0, dd));
+      ctx.scale(ss, ss);
+      shadow(0.7);
+      ctx.fillStyle = OUTLINE; roundRect(-0.62, -0.62, 1.24, 0.62, 0.05); ctx.fill();
+      ctx.fillStyle = '#d9d9d9'; roundRect(-0.58, -0.58, 1.16, 0.56, 0.04); ctx.fill();
+      ctx.fillStyle = C.gold;
+      ctx.save(); ctx.scale(0.01, 0.01);
+      ctx.font = '36px ' + HUD_FONT; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('1', 0, -30);
+      ctx.restore();
+      ctx.translate(0, -0.6);
+      const k = KITS.kampioen;
+      for (const side of [-1, 1]) {
+        limb(side * 0.12, -0.86, side * 0.14, -0.44, 0.15, C.skin);
+        limb(side * 0.14, -0.44, side * 0.13, -0.06, 0.12, C.skin);
+      }
+      ctx.fillStyle = k.shorts; roundRect(-0.25, -1.02, 0.5, 0.3, 0.05); ctx.fill();
+      roundRect(-0.29, -1.52, 0.58, 0.56, 0.07);
+      ctx.fillStyle = k.shirt; ctx.fill();
+      ctx.strokeStyle = OUTLINE; ctx.lineWidth = 0.03; ctx.stroke();
+      for (let i = 0; i < 3; i++) { ctx.fillStyle = k.stripes[i]; ctx.fillRect(-0.29, -1.3 + i * 0.08, 0.58, 0.05); }
+      const near = b.at - dist < 70;
+      const shake = near ? Math.sin(frame * 0.5) * 0.1 : 0;
+      limb(-0.3, -1.42, -0.46, -1.1, 0.11, C.skin);
+      limb(0.3, -1.42, 0.5, -1.75 + shake, 0.11, C.skin);          // vuist omhoog
+      ctx.fillStyle = C.skin; ctx.beginPath(); ctx.arc(0.52, -1.82 + shake, 0.08, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = OUTLINE; ctx.beginPath(); ctx.arc(0, -1.68, 0.165, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = C.skin; ctx.beginPath(); ctx.arc(0, -1.68, 0.15, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(0, -1.72, 0.15, Math.PI, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#111';
+      ctx.fillRect(-0.075, -1.67, 0.035, 0.04); ctx.fillRect(0.04, -1.67, 0.035, 0.04);
+      ctx.restore();
+    }
+    // banner op het scherm: voor de poort de aankondiging, erna de bonus
+    function drawBossBanner(state) {
+      const every = (root.TTR && root.TTR.BOSS_EVERY) || 1000;
+      const dist = state.dist || 0;
+      const kNext = Math.floor(dist / every) + 1, atNext = kNext * every;
+      const kLast = Math.floor(dist / every), atLast = kLast * every;
+      let text = null, color = C.gold, alpha = 1;
+      if (kLast >= 1 && dist - atLast < 45 && state.alive !== false) {
+        const bonus = ((root.TTR_CONFIG && root.TTR_CONFIG.game) || {}).bossBonus || 250;
+        text = '+' + bonus + ' KAMPIOEN VERSLAGEN!';
+        alpha = clamp(1 - (dist - atLast - 25) / 20, 0, 1);
+      } else if (dist >= bossStart(state, kNext, atNext) - 30 && dist < atNext) {
+        text = 'BAAS ' + kNext + ': DE CLUBKAMPIOEN';
+        color = '#fff';
+      }
+      if (!text) return;
+      const fs = Math.round(clamp(Math.min(W, H) * 0.035, 10, 20));
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.font = fs + 'px ' + HUD_FONT;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      const w = Math.min(W - 16, ctx.measureText(text).width + fs * 1.6), y = H * 0.27;
+      ctx.fillStyle = 'rgba(2,19,43,0.75)';
+      ctx.fillRect(cx - w / 2, y - fs * 1.1, w, fs * 2.2);
+      ctx.fillStyle = C.gold;
+      ctx.fillRect(cx - w / 2, y - fs * 1.1, w, 2); ctx.fillRect(cx - w / 2, y + fs * 1.1 - 2, w, 2);
+      ctx.lineJoin = 'round'; ctx.lineWidth = Math.max(3, fs * 0.35); ctx.strokeStyle = C.ink;
+      ctx.strokeText(text, cx, y, W - 32);
+      ctx.fillStyle = color;
+      ctx.fillText(text, cx, y, W - 32);
+      ctx.restore();
+    }
+
     function drawNopper(item, d, frame) {
       const s = f / d;
       const x = (item.lane - 1) * LANE_W;
@@ -1669,7 +1884,7 @@
 
       ctx.save();
       drawBackground();
-      drawFloor(dist);
+      drawFloor(dist, state);
 
       // tekenlijst opbouwen
       list.length = 0;
@@ -1696,6 +1911,7 @@
         list.push({ key, it });
       }
       addSideProps();
+      addBosses(state);
       list.push({ key: CAM_BACK, it: null });
       list.sort((a, b) => b.key - a.key);
 
@@ -1703,6 +1919,7 @@
         const e = list[i];
         const it = e.it;
         if (e.burst) { ctx.globalAlpha = 1; drawBurst(e.burst, state); continue; }
+        if (e.boss) { ctx.globalAlpha = 1; drawBoss(e.boss, frame, dist); continue; }
         if (e.side) {
           const fd = clamp((VIEW_AHEAD + CAM_BACK - e.key) / (VIEW_AHEAD + CAM_BACK - FADE_FROM), 0, 1);
           if (fd <= 0) continue;
@@ -1717,6 +1934,7 @@
         ctx.globalAlpha = fade;
         switch (it.type) {
           case 'nopper': drawNopper(it, d0, frame); break;
+          case 'chopper': drawChopper(it, d0, frame, dist); break;
           case 'table': drawTable(it, d0, d1); break;
           case 'net': drawNet(it, (d0 + d1) / 2); break;
           case 'machine': drawMachine(it, d0, d1, frame); break;
@@ -1747,6 +1965,7 @@
         ctx.fillStyle = 'rgba(200,36,42,0.28)';
         ctx.fillRect(0, 0, W, H);
       }
+      drawBossBanner(state);
       drawHud(state);
       ctx.restore();
     }

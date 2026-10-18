@@ -14,7 +14,7 @@ test('zonder Web Audio: aanzetten lukt niet en spelen doet niets, zonder fouten'
 
 test('elke gebeurtenis in het spel heeft een geluid', () => {
   const a = createAudio();
-  for (const ev of ['jump', 'slide', 'lane', 'ball', 'shield', 'magnet', 'timeout', 'bak', 'block', 'crash', 'land', 'cheer']) {
+  for (const ev of ['jump', 'slide', 'lane', 'ball', 'shield', 'magnet', 'timeout', 'bak', 'block', 'crash', 'land', 'cheer', 'boss']) {
     assert.ok(a.names.includes(ev), ev);
   }
 });

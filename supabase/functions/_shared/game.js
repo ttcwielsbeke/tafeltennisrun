@@ -20,6 +20,7 @@
   // hoogtebereik [onder, boven] in meter: waar je tegen botst
   const SPAN = {
     nopper:  [0, 2.0],      // over een speler spring je niet
+    chopper: [0, 2.0],      // de verdediger: idem, maar hij schuift op
     table:   [0, 0.72],      // een tikje vergevingsgezind t.o.v. 0,76 m
     net:     [0.95, 2.4],    // hangt tot boven: eronder, niet erover
     machine: [1.05, 2.4]
@@ -32,7 +33,7 @@
       frame: 0, alive: true, crashedBy: null,
       dist: 0, speed: c.startSpeed, vel: c.startSpeed,
       lane: 1, x: 1, y: 0, vy: 0, sliding: 0,
-      balls: 0, points: 0, shield: false, magnet: 0, grace: 0, timeout: 0, bak: 0,
+      bossNext: c.bossEvery, balls: 0, points: 0, shield: false, magnet: 0, grace: 0, timeout: 0, bak: 0,
       items: [], corners: [], events: [], nextChunk: 0
     };
     fill(s);
@@ -75,6 +76,12 @@
     const slow = s.timeout > 0 ? 1 - (1 - c.timeoutSlow) * Math.min(1, s.timeout / 30) : 1;
     s.vel = s.speed * slow;
     s.dist += s.vel * DT;
+    // levend langs de clubkampioen: bonus
+    while (s.dist >= s.bossNext) {
+      s.points += c.bossBonus;
+      s.events.push('boss');
+      s.bossNext += c.bossEvery;
+    }
 
     // opzij
     const dx = s.lane - s.x, stepX = 1 / c.laneFrames;

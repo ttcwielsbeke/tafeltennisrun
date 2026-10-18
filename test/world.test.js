@@ -21,7 +21,7 @@ test('andere seed geeft een andere baan', () => {
 });
 
 test('items blijven netjes: geldige baan, type en volgorde', () => {
-  const types = new Set(['nopper', 'table', 'net', 'machine', 'ball', 'shield', 'magnet', 'timeout', 'bak']);
+  const types = new Set(['nopper', 'chopper', 'table', 'net', 'machine', 'ball', 'shield', 'magnet', 'timeout', 'bak']);
   for (const seed of SEEDS) {
     for (let i = 0; i < CHUNKS; i++) {
       const items = W.generateChunk(seed, i);
@@ -251,4 +251,71 @@ test('laat in de run is een volle rij tafels of netten nooit meer gratis: altijd
     }
   }
   assert.ok(pairs >= 20, 'te weinig combinaties: ' + pairs);
+});
+
+/* ---------- chopper en baas ---------- */
+
+function itemsUpTo(seed, chunks) {
+  const out = [];
+  for (let i = 0; i < chunks; i++) out.push(...W.generateChunk(seed, i));
+  return out;
+}
+
+test('chopper: pas na 2 minuten, naar een buurbaan, klaar met bewegen ≥ 1 s voor je er bent', () => {
+  let total = 0;
+  for (const seed of SEEDS) {
+    const choppers = itemsUpTo(seed, LATE).filter((it) => it.type === 'chopper');
+    for (const c of choppers) {
+      // gewone rijen: pas na 2 minuten (de baas op 2 km heeft er wel een)
+      if (!c.boss) assert.ok(c.z > 1920, seed + ': chopper te vroeg op z=' + c.z);
+      assert.equal(Math.abs(c.from - c.lane), 1, 'enkel naar een buurbaan');
+      assert.ok(c.moveLen > 0 && c.moveAt > c.moveLen, 'beweging heeft een lengte');
+      assert.ok((c.moveAt - c.moveLen) / W.expectedSpeed(c.z) >= 1 - 1e-9, seed + ': te laat klaar op z=' + c.z);
+    }
+    total += choppers.length;
+  }
+  assert.ok(total >= 25, 'te weinig choppers: ' + total);
+});
+
+test('choppers komen vaker naarmate je verder loopt', () => {
+  let early = 0, late = 0;
+  for (const seed of SEEDS) {
+    for (const c of itemsUpTo(seed, LATE).filter((it) => it.type === 'chopper' && !it.boss)) {
+      if (c.z < 4400) early++;            // ~2-3 min
+      else if (c.z >= 9400) late++;       // vanaf ~6 min, even lang stuk (2,5 km)
+    }
+  }
+  assert.ok(late > early * 1.5, 'niet vaker later: ' + early + ' → ' + late);
+});
+
+test('een rij met een chopper laat altijd een veilige baan', () => {
+  for (const seed of SEEDS) {
+    for (const r of W.rowsOf(itemsUpTo(seed, LATE))) {
+      if (!r.lanes.includes('chopper')) continue;
+      assert.ok(W.isRowSafe(r), seed + ' rij ' + r.row + ' ' + r.lanes);
+    }
+  }
+});
+
+test('om de 1000 m een baas: 5 rijen, enkel baasrijen in dat stuk, telkens moeilijker', () => {
+  const full = (l, t) => l.every((x) => x === t);
+  for (const seed of SEEDS) {
+    const items = itemsUpTo(seed, LATE);
+    const rows = W.rowsOf(items);
+    for (let k = 1; k <= 10; k++) {
+      const boss = rows.filter((r) => items.some((it) => it.row === r.row && it.boss === k));
+      assert.equal(boss.length, 5, seed + ' baas ' + k);
+      assert.ok(boss[4].z < k * W.BOSS_EVERY, 'baasrijen liggen voor de baas');
+      const first = boss[0].z;
+      for (const r of rows) {
+        if (r.z >= first && r.z <= k * W.BOSS_EVERY) assert.ok(boss.includes(r), seed + ' vreemde rij in baas ' + k + ' op z=' + r.z);
+      }
+      const hasChopper = boss.some((r) => r.lanes.includes('chopper'));
+      const hasCombo = boss.some((r, i) => i > 0 && ((full(boss[i - 1].lanes, 'table') && full(r.lanes, 'net')) || (full(boss[i - 1].lanes, 'net') && full(r.lanes, 'table'))));
+      if (k === 1) assert.ok(!hasChopper, 'eerste baas: opwarmer zonder chopper');
+      if (k >= 2) assert.ok(hasChopper, 'baas ' + k + ' heeft een chopper');
+      if (k >= 3) assert.ok(hasCombo, 'baas ' + k + ' heeft een combinatie');
+      for (const r of boss) assert.ok(W.isRowSafe(r));
+    }
+  }
 });

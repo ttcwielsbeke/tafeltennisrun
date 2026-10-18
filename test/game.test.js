@@ -50,6 +50,16 @@ test('na 2 minuten versnelt het spel trager door, tot 30 m/s rond 6 minuten', ()
   assert.equal(at(400), 30);                        // topsnelheid na ~6 minuten
 });
 
+test('langs een baas lopen geeft 250 bonuspunten, om de 1000 m', () => {
+  const s = G.createGame('x');
+  s.items = []; s.nextChunk = 1e9;
+  let bosses = 0;
+  while (s.dist < 2100) { G.step(s, []); if (s.events.includes('boss')) bosses++; }
+  assert.equal(bosses, 2);
+  assert.equal(s.points, 500);
+  assert.equal(G.scoreOf(s), Math.floor(s.dist) + 500);
+});
+
 test('een bal is 5 punten waard: afstand blijft de hoofdzaak', () => {
   assert.equal(G.createGame('x').cfg.ballPoints, 5);
 });
@@ -125,5 +135,5 @@ test('de lus doet vaste stappen van 1/60 s, los van de beeldsnelheid', () => {
 // Dan bewust opnieuw berekenen en hier aanpassen.
 const GOLDEN = {
   script: { frame: 426, score: 73, alive: false, crashedBy: 'table' },   // onder het net door, dan tegen een tafel
-  bot: { frame: 7200, score: 2210, balls: 53, alive: true }    // spelversie 2: sneller op snelheid, bal = 5
+  bot: { frame: 7200, score: 2455, balls: 51, alive: true }    // spelversie 3: baas op 1 km (+250), chopper
 };

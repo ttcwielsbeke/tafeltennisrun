@@ -10,6 +10,7 @@ const ob = (id, type, lane, z) => ({ id, type, lane, z, len: 1 });
 
 test('een obstakel in je baan binnen 1,5 s geeft de juiste tip', () => {
   assert.equal(hintFor(state([ob('a', 'nopper', 1, 120)]), {}, true).kind, 'lane');
+  assert.equal(hintFor(state([ob('a', 'chopper', 1, 120)]), {}, true).kind, 'lane');
   assert.equal(hintFor(state([ob('a', 'table', 1, 120)]), {}, true).kind, 'jump');
   assert.equal(hintFor(state([ob('a', 'net', 1, 120)]), {}, true).kind, 'slide');
   assert.equal(hintFor(state([ob('a', 'machine', 1, 120)]), {}, true).kind, 'slide');

@@ -60,8 +60,11 @@ create table if not exists public.runs (
   ),
   constraint runs_score_bereik check (score between 0 and 1000000),
   constraint runs_frames_bereik check (frames between 1 and 108000),  -- 30 minuten
-  -- Meer dan dist + 20 per bal kan niet: 10 per bal, x2 met de ballenbak.
-  constraint runs_score_max check (score <= dist + balls * 20),
+  -- Meer kan niet: elke meter 1, hoogstens 20 per bal (x2 met de ballenbak), en 250 per
+  -- gepasseerde clubkampioen (om de 1000 m). Ruim gerekend en in bigint: overloopt niet.
+  constraint runs_score_max check (
+    score::bigint <= dist::bigint + balls::bigint * 20 + (dist::bigint / 1000) * 250
+  ),
   -- dist <= frames * 40 / 60 + 1 (40 m/s is een ruime bovengrens).
   -- Hier vermenigvuldigd in plaats van gedeeld, zodat integerdeling
   -- niets afrondt: dist * 60 <= frames * 40 + 60. De bigint-casts
@@ -75,6 +78,13 @@ create table if not exists public.runs (
 -- (Bestaan er al runs, dan blijft de kolom daar leeg; nieuwe runs vullen
 -- ze altijd in. Een lege waarde botst niet in de unieke index.)
 alter table public.runs add column if not exists inputs_hash text;
+
+-- Spelversie 3 (clubkampioen-bonus): de bovengrens van de score opnieuw zetten,
+-- ook op een database die de oude versie van deze check al had.
+alter table public.runs drop constraint if exists runs_score_max;
+alter table public.runs add constraint runs_score_max check (
+  score::bigint <= dist::bigint + balls::bigint * 20 + (dist::bigint / 1000) * 250
+);
 create unique index if not exists runs_seed_inputs_hash_uniq
   on public.runs (seed, inputs_hash);
 

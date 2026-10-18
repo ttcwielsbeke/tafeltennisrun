@@ -24,7 +24,7 @@
     },
 
     game: {
-      version: 2,            // spelversie: verhogen bij elke wijziging aan spellogica of baan
+      version: 3,            // spelversie: verhogen bij elke wijziging aan spellogica of baan
 
       /* snelheid in meter per seconde */
       startSpeed: 10,
@@ -40,6 +40,8 @@
       laneFrames: 8,         // hoelang een baanwissel duurt
 
       /* punten en power-ups */
+      bossEvery: 1000,       // om de zoveel meter wacht de clubkampioen ...
+      bossBonus: 250,        // ... en wie er levend voorbij komt, krijgt deze bonus
       ballPoints: 5,         // punten per bal: afstand blijft de hoofdzaak
       magnetFrames: 360,     // magneet: 6 seconden
       magnetReach: 9,        // magneet trekt ballen tot zoveel meter voor je

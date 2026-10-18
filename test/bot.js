@@ -8,8 +8,8 @@ function bot(s) {
     .filter((i) => !i.taken && !i.broken && G.SPAN[i.type] && i.z + i.len > s.dist && i.z < s.dist + reach && i.lane === s.lane);
   if (!near.length) return [];
   const it = near[0];
-  if (it.type === 'nopper') {
-    const blocked = new Set(s.items.filter((i) => i.type === 'nopper' && i.row === it.row).map((i) => i.lane));
+  if (it.type === 'nopper' || it.type === 'chopper') {
+    const blocked = new Set(s.items.filter((i) => (i.type === 'nopper' || i.type === 'chopper') && i.row === it.row).map((i) => i.lane));
     const free = [0, 1, 2].filter((l) => !blocked.has(l))
       .sort((a, b) => Math.abs(a - s.lane) - Math.abs(b - s.lane))[0];
     if (free < s.lane) return ['left'];

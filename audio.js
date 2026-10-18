@@ -210,6 +210,19 @@
         o.connect(lp); lp.connect(g); g.connect(out);
         o.start(t + 0.12); o.stop(t + 0.8);
       },
+      // de clubkampioen verslagen: korte fanfare in koper, daarna juicht de hal
+      boss(t) {
+        [523, 659, 784, 1047, 784, 1047].forEach((f, i) => {
+          const at = t + [0, 0.11, 0.22, 0.33, 0.5, 0.6][i], len = i === 5 ? 0.5 : 0.1;
+          const o = ac.createOscillator(), lp = ac.createBiquadFilter(), g = ac.createGain();
+          o.type = 'sawtooth'; o.frequency.setValueAtTime(f, at);
+          lp.type = 'lowpass'; lp.frequency.value = 2600;
+          env(g, at, 0.012, 0.11, len);
+          o.connect(lp); lp.connect(g); g.connect(out);
+          o.start(at); o.stop(at + len + 0.05);
+        });
+        SOUNDS.cheer(t + 0.35);
+      },
       // mijlpaal: het publiek juicht en klapt
       cheer(t) {
         const g = ac.createGain(), bp = ac.createBiquadFilter(), src = ac.createBufferSource();

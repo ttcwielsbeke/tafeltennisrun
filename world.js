@@ -10,7 +10,7 @@
   const CHUNK_LEN = 120;      // meter per stuk baan
   const MIN_ROW_GAP = 18;     // twee baanwissels of een volle sprong bij topsnelheid
   const START_FREE = 40;      // de eerste 40 m is leeg: even op gang komen
-  const LEN = { nopper: 0.6, table: 1.5, net: 0.2, machine: 0.8, ball: 0.3, shield: 0.5, magnet: 0.5, timeout: 0.5, bak: 0.5 };
+  const LEN = { nopper: 0.6, chopper: 0.6, table: 1.5, net: 0.2, machine: 0.8, ball: 0.3, shield: 0.5, magnet: 0.5, timeout: 0.5, bak: 0.5 };
 
   const CFG = (root.TTR_CONFIG && root.TTR_CONFIG.game) ||
     (typeof require === 'function' ? require('./config.js').game : {});
@@ -70,12 +70,21 @@
       { w: 4, min: 0.1, make() { lanes[others[0]] = lanes[others[1]] = 'nopper'; } },
       { w: 3, min: 0.2, make() { lanes[L] = 'nopper'; for (const o of others) lanes[o] = 'table'; } },
       { w: 3, min: 0.3, make() { lanes[L] = 'nopper'; for (const o of others) lanes[o] = 'net'; } },
+      // chopper: een verdediger die opschuift naar een buurbaan (pas na 2 minuten). De baan waar hij
+      // vertrekt is vrij als je er bent; soms staat er in de derde baan nog een noppenspeler.
+      { w: 0.5 + 3 * late, min: 0.4, late: true, make() {    // steeds vaker naarmate je verder loopt
+          const to = L === 1 ? (rng.chance(0.5) ? 0 : 2) : 1;
+          lanes[to] = 'chopper';
+          lanes.chopperFrom = L;
+          const third = 3 - L - to;
+          if (rng.chance(0.5 * late)) lanes[third] = 'nopper';
+        } },
       { w: 3, min: 0.4, make() {
           const kinds = ['nopper', 'table', 'net', 'machine', null];
           for (let i = 0; i < 3; i++) lanes[i] = rng.pick(kinds);
           if (lanes.every((t) => t === 'nopper')) lanes[L] = rng.pick(['table', 'net', null]);
         } }
-    ].filter((o) => d >= o.min);
+    ].filter((o) => d >= o.min && (!o.late || late > 0));
     // later: minder losse noppenspelers, meer gemengde rijen
     // (twee noppenspelers en gemengde rijen dwingen een keuze af; volle rijen worden later altijd een combinatie)
     if (late > 0) for (const o of options) o.w *= o.min >= 0.1 ? 1 + 4 * late : o.w === 4 ? 1 - 0.6 * late : 1 - 0.3 * late;
@@ -133,6 +142,63 @@
     return corners.some((c) => z >= c.z - CORNER_MARGIN && z <= c.z + c.len);
   }
 
+  /* ---------- chopper ----------
+     Hij schuift op naar zijn eindbaan (it.lane) wanneer je nog moveAt meter weg bent; dat duurt
+     moveLen meter. Klaar met bewegen minstens 1 s voor je er bent: tijd om te reageren. */
+  const CHOPPER_REACT = 1.05, CHOPPER_SHUFFLE = 0.4;   // seconden
+  function chopperItem(lane, from, z, row, v, extra) {
+    const moveLen = round1(v * CHOPPER_SHUFFLE);
+    return Object.assign({ type: 'chopper', lane, from, z, len: LEN.chopper, row,
+      moveLen, moveAt: round1(v * CHOPPER_REACT + moveLen + 0.1) }, extra || {});
+  }
+
+  /* ---------- baas: de clubkampioen, om de 1000 m ----------
+     Vijf vaste rijen vlak voor elke 1000 m, telkens moeilijker. Ze hangen enkel af van seed en k,
+     dus elk stuk baan kan ze zelf uitrekenen. Gewone rijen blijven buiten de zone eromheen. */
+  const BOSS_EVERY = CFG.bossEvery || 1000, BOSS_ROWS = 5, BOSS_LEAD = 15;
+  function bossPlan(seed, k) {
+    const rng = makeRng(seed + '#baas#' + k);
+    const at = k * BOSS_EVERY;
+    const zs = [at - BOSS_LEAD];
+    while (zs.length < BOSS_ROWS) {
+      const next = zs[0], v = expectedSpeed(next);
+      zs.unshift(round1(next - Math.max(minGap(v), v * 1.15)));
+    }
+    const L = () => rng.int(3);
+    const nb = (l) => (l === 1 ? (rng.chance(0.5) ? 0 : 2) : 1);
+    const one = (t) => { const l = [null, null, null]; l[L()] = t; return l; };
+    const two = () => { const l = ['nopper', 'nopper', 'nopper']; l[L()] = null; return l; };
+    const all = (t) => [t, t, t];
+    const mixed = (t) => { const l = [t, t, t]; l[L()] = 'nopper'; return l; };
+    const chop = (withNopper) => {
+      const from = L(), to = nb(from), l = [null, null, null];
+      l[to] = 'chopper'; l.chopperFrom = from;
+      if (withNopper) l[3 - from - to] = 'nopper';
+      return l;
+    };
+    let rows;
+    if (k === 1) rows = [one('nopper'), all('table'), two(), all('net'), mixed('table')];
+    else if (k === 2) rows = [two(), chop(false), all('table'), mixed('net'), two()];
+    else {
+      const first = rng.chance(0.5) ? 'table' : 'net';
+      rows = [two(), chop(true), all(first), all(first === 'table' ? 'net' : 'table'), k >= 5 ? chop(true) : mixed('table')];
+    }
+    const last = zs[BOSS_ROWS - 1];
+    return { k, at, rows: rows.map((lanes, i) => ({ z: zs[i], lanes })),
+      zoneStart: zs[0] - minGap(expectedSpeed(zs[0])), zoneEnd: Math.max(at + 1, last + minGap(expectedSpeed(last)) + 0.2) };
+  }
+  function bossesNear(seed, from, to) {
+    const out = [];
+    for (let k = Math.max(1, Math.floor(from / BOSS_EVERY)); k <= Math.floor(to / BOSS_EVERY) + 1; k++) out.push(bossPlan(seed, k));
+    return out;
+  }
+  // hoogstens één noppenspeler of chopper in een bocht; noppenspelers gaan eerst weg
+  function limitInCorner(lanes) {
+    const count = () => lanes.filter((t) => t === 'nopper' || t === 'chopper').length;
+    for (let l = 0; l < 3 && count() > 1; l++) if (lanes[l] === 'nopper') lanes[l] = null;
+    for (let l = 0; l < 3 && count() > 1; l++) if (lanes[l] === 'chopper') lanes[l] = null;
+  }
+
   function generateChunk(seed, index) {
     const rng = makeRng(seed + '#' + index);
     const corners = cornersOf(seed, index);
@@ -148,6 +214,28 @@
     let z = start + (index === 0 ? START_FREE : minGap(expectedSpeed(start)) / 2) + rng.next() * 6;
     const endHalf = minGap(expectedSpeed(end)) / 2;
     let forced = null;                           // tweede rij van een combinatie
+    const bosses = bossesNear(seed, start, end);
+    const zoneAt = (zz) => bosses.find((b) => zz > b.zoneStart && zz < b.zoneEnd);
+    const nextBossRow = (zz) => {
+      let best = Infinity;
+      for (const b of bosses) for (const r of b.rows) if (r.z > zz && r.z < best) best = r.z;
+      return best;
+    };
+    // de baasrijen die in dit stuk vallen
+    for (const b of bosses) {
+      b.rows.forEach((br, i) => {
+        if (br.z < start || br.z >= end) return;
+        const row = 'baas' + b.k + ':' + i, lanes = br.lanes.slice();
+        lanes.chopperFrom = br.lanes.chopperFrom;
+        if (inCorner(corners, br.z)) limitInCorner(lanes);
+        lanes.forEach((type, lane) => {
+          if (!type) return;
+          if (type === 'chopper') add(chopperItem(lane, lanes.chopperFrom, br.z, row, expectedSpeed(br.z), { boss: b.k }));
+          else add({ type, lane, z: br.z, len: LEN[type], row, boss: b.k });
+        });
+      });
+    }
+    if (zoneAt(z)) z = zoneAt(z).zoneEnd;
     while (z <= end - endHalf) {
       const rowZ = round1(z);
       const row = index + ':' + rowZ;
@@ -161,16 +249,14 @@
       let comboNext = null;
       const full = lanes[0] === lanes[1] && lanes[1] === lanes[2] && (lanes[0] === 'table' || lanes[0] === 'net');
       if (late > 0 && full && !wasForced) {
-        if (z + minGap(v) <= end - endHalf) comboNext = lanes[0] === 'table' ? 'net' : 'table';
+        if (z + minGap(v) <= end - endHalf && !zoneAt(z + minGap(v))) comboNext = lanes[0] === 'table' ? 'net' : 'table';
         else lanes[1] = 'nopper';
       }
       // in een bocht hoogstens één noppenspeler: twee veilige banen, de bocht leest al moeilijk genoeg
-      if (inCorner(corners, rowZ)) {
-        let seen = 0;
-        for (let l = 0; l < 3; l++) if (lanes[l] === 'nopper' && ++seen > 1) lanes[l] = null;
-      }
+      if (inCorner(corners, rowZ)) limitInCorner(lanes);
       lanes.forEach((type, lane) => {
-        if (type) add({ type, lane, z: rowZ, len: LEN[type], row });
+        if (type === 'chopper') add(chopperItem(lane, lanes.chopperFrom, rowZ, row, v));
+        else if (type) add({ type, lane, z: rowZ, len: LEN[type], row });
       });
 
       // afstand tot de volgende rij: eerst in meter zoals altijd, later in tijd bij de verwachte snelheid
@@ -185,6 +271,8 @@
         gap = 0;
       }
       gap = Math.max(gap, minGap(v));
+      // ballen en power-ups blijven voor de eerstvolgende baasrij
+      const itemGap = Math.min(gap, nextBossRow(rowZ) - rowZ - 1);
 
       // een bal boven een tafel, voor wie durft te springen
       const tableLane = lanes.indexOf('table');
@@ -199,7 +287,7 @@
         const count = 3 + rng.int(3);
         for (let i = 0; i < count; i++) {
           const bz = first + i * 2.2;
-          if (bz + LEN.ball > rowZ + gap - 2) break;
+          if (bz + LEN.ball > rowZ + itemGap - 2) break;
           add({ type: 'ball', lane: ballLane, z: round1(bz), len: LEN.ball });
         }
       }
@@ -209,10 +297,11 @@
       if (p < 0.2 && index > 0) {
         const lane = (ballLane + 1 + rng.int(2)) % 3;
         const type = p < 0.055 ? 'shield' : p < 0.11 ? 'magnet' : p < 0.155 ? 'timeout' : 'bak';
-        add({ type, lane, z: round1(rowZ + gap / 2), len: LEN[type] });
+        add({ type, lane, z: round1(rowZ + itemGap / 2), len: LEN[type] });
       }
 
       z += gap;
+      if (zoneAt(z)) z = zoneAt(z).zoneEnd;
     }
 
     items.sort((a, b) => a.z - b.z || a.lane - b.lane);
@@ -233,7 +322,7 @@
 
   // veilig = minstens één baan zonder noppenspeler (tafel = springen, net = sliden)
   function isRowSafe(row) {
-    return row.lanes.some((t) => t !== 'nopper');
+    return row.lanes.some((t) => t !== 'nopper' && t !== 'chopper');
   }
 
   TTR.cornersOf = cornersOf;
@@ -244,12 +333,13 @@
   TTR.MIN_ROW_GAP = MIN_ROW_GAP;
   TTR.ITEM_LEN = LEN;
   TTR.generateChunk = generateChunk;
+  TTR.BOSS_EVERY = BOSS_EVERY;
   TTR.expectedSpeed = expectedSpeed;
   TTR.expectedTime = expectedTime;
   TTR.rowsOf = rowsOf;
   TTR.isRowSafe = isRowSafe;
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = { CHUNK_LEN, MIN_ROW_GAP, MIN_ROW_TIME, ITEM_LEN: LEN, generateChunk, rowsOf, isRowSafe,
-      cornersOf, curveAt, headingAt, inCorner, expectedSpeed, expectedTime };
+      cornersOf, curveAt, headingAt, inCorner, expectedSpeed, expectedTime, BOSS_EVERY };
   }
 })(typeof globalThis !== 'undefined' ? globalThis : this);

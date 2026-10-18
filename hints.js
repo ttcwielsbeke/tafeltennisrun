@@ -15,7 +15,7 @@
     jump:  { touch: 'Veeg omhoog: spring!', keys: 'Pijltje omhoog of spatie: spring!' },
     slide: { touch: 'Veeg omlaag: slide!',  keys: 'Pijltje omlaag: slide!' }
   };
-  const KIND = { nopper: 'lane', table: 'jump', net: 'slide', machine: 'slide' };
+  const KIND = { nopper: 'lane', chopper: 'lane', table: 'jump', net: 'slide', machine: 'slide' };
 
   // het dichtstbijzijnde obstakel in je baan, binnen AHEAD_S, waarvan je de soort nog niet kent
   function hintFor(state, learned, touch) {

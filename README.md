@@ -20,6 +20,11 @@ Open `index.html` of speel online (GitHub Pages, zie onder).
 | pauze | knop rechtsboven | P of Esc |
 
 - **Noppenspeler** (rood, PIPS OUT!) → wissel van baan. Over een speler spring je niet.
+- **Chopper** (wit-blauw, lange noppen, vanaf 2 minuten): een verdediger die naar een buurbaan opschuift als je
+  nadert. Je ziet hem eerst overhellen; hij staat minstens 1 s voor je er bent op zijn plek. Hoe verder, hoe vaker.
+- **De clubkampioen** wacht om de 1000 m achter een gouden poort. De laatste stukken ervoor zijn vijf vaste rijen
+  (de vloer licht goud op), telkens moeilijker: eerst een opwarmer, vanaf 2 km met een chopper, vanaf 3 km met een
+  combinatie. Kom je er levend voorbij, dan krijg je **+250**.
 - **Tafel** → spring erover. **Net** of **ballenmachine** → slide eronderdoor.
 - **Balletje** = 5 punten, elke meter = 1 punt: ver lopen telt het zwaarst.
 - **Schild-bat** (blauw): je overleeft één botsing. **Magneet** (goud): 6 seconden lang komen de ballen naar jou.
