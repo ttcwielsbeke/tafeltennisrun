@@ -921,27 +921,34 @@
       }
     }
 
+    /* Tafels naast elkaar in dezelfde rij zijn samen één echte tafel, 90° gedraaid:
+       de lange kant dwars over de banen, het net in het midden van die lange kant
+       (in de diepte), de middenlijn dwars. De meest linkse tafel van de groep tekent
+       alles; een tafel alleen in zijn baan staat in de looprichting. */
     function drawTable(item, d0, d1) {
-      const xm = (item.lane - 1) * LANE_W;
-      const x0 = xm - LANE_W / 2, x1 = xm + LANE_W / 2;
+      const mask = item.row != null && !item.broken ? (tableRows[item.row] || 0) : 0;
+      let a = item.lane, b = item.lane;
+      if (mask) {
+        while (a > 0 && (mask & (1 << (a - 1)))) a--;
+        while (b < 2 && (mask & (1 << (b + 1)))) b++;
+      }
+      if (a !== item.lane) return;
+      const wide = b > a;
+      const x0 = (a - 1) * LANE_W - LANE_W / 2, x1 = (b - 1) * LANE_W + LANE_W / 2;
+      const xm = (x0 + x1) / 2;
       const top = 0.76, th = 0.05;
       ctx.save();
       if (item.broken) ctx.globalAlpha *= 0.3;
       // schaduw op de vloer
       ctx.fillStyle = 'rgba(0,0,0,0.22)';
       ctx.beginPath(); quadFloor(x0 + 0.05, x1 - 0.05, d0 + 0.1, d1 - 0.1); ctx.fill();
-      // poten
-      const lw = Math.max(1, 0.05 * f / d0);
+      // poten: aan de uiteinden, en bij een lange tafel ook onder elke helft
+      const legX = wide ? [x0 + 0.15, xm - 0.45, xm + 0.45, x1 - 0.15] : [x0 + 0.15, x1 - 0.15];
       ctx.strokeStyle = C.legs;
-      ctx.lineWidth = lw;
+      ctx.lineWidth = Math.max(1, 0.05 * f / d0);
       ctx.beginPath();
-      const lz = [d1 - 0.2, d0 + 0.2];
-      for (let i = 0; i < 2; i++) {
-        const d = lz[i];
-        for (let k = 0; k < 2; k++) {
-          const x = k ? x1 - 0.15 : x0 + 0.15;
-          ctx.moveTo(sx(x, d), sy(0, d)); ctx.lineTo(sx(x, d), sy(top - th, d));
-        }
+      for (const d of [d1 - 0.2, d0 + 0.2]) {
+        for (const x of legX) { ctx.moveTo(sx(x, d), sy(0, d)); ctx.lineTo(sx(x, d), sy(top - th, d)); }
       }
       ctx.stroke();
       // voorkant
@@ -952,33 +959,35 @@
       ctx.beginPath(); quadAt(x0, x1, d0, d1, top); ctx.fill();
       ctx.fillStyle = 'rgba(255,255,255,0.08)';
       ctx.beginPath(); quadAt(x0, x1, d0 + (d1 - d0) * 0.55, d1, top); ctx.fill();
-      // witte randen
-      const mask = item.row != null ? (tableRows[item.row] || 0) : 0;
-      const hasL = item.lane > 0 && (mask & (1 << (item.lane - 1)));
-      const hasR = item.lane < 2 && (mask & (1 << (item.lane + 1)));
+      // witte rand rondom
       ctx.strokeStyle = '#fff';
       ctx.lineWidth = Math.max(1, 0.03 * f / d0);
-      ctx.beginPath();
-      ctx.moveTo(sx(x0, d0), sy(top, d0)); ctx.lineTo(sx(x1, d0), sy(top, d0));
-      ctx.moveTo(sx(x0, d1), sy(top, d1)); ctx.lineTo(sx(x1, d1), sy(top, d1));
-      if (!hasL) { ctx.moveTo(sx(x0 + 0.02, d0), sy(top, d0)); ctx.lineTo(sx(x0 + 0.02, d1), sy(top, d1)); }
-      if (!hasR) { ctx.moveTo(sx(x1 - 0.02, d0), sy(top, d0)); ctx.lineTo(sx(x1 - 0.02, d1), sy(top, d1)); }
-      ctx.stroke();
+      ctx.beginPath(); quadAt(x0 + 0.02, x1 - 0.02, d0, d1, top); ctx.stroke();
+      // middenlijn: in de lengte van de tafel
+      const dm = (d0 + d1) / 2;
       ctx.lineWidth = Math.max(0.6, 0.012 * f / d0);
       ctx.strokeStyle = 'rgba(255,255,255,0.7)';
       ctx.beginPath();
-      ctx.moveTo(sx(xm, d0), sy(top, d0)); ctx.lineTo(sx(xm, d1), sy(top, d1));
+      if (wide) { ctx.moveTo(sx(x0, dm), sy(top, dm)); ctx.lineTo(sx(x1, dm), sy(top, dm)); }
+      else { ctx.moveTo(sx(xm, d0), sy(top, d0)); ctx.lineTo(sx(xm, d1), sy(top, d1)); }
       ctx.stroke();
-      // netje dwars over het midden: zo is het meteen een tafeltennistafel
-      const dm = (d0 + d1) / 2, nh = 0.15;
+      // net dwars over de lange kant, iets over de rand met een paaltje aan elke kant
+      const nh = 0.15, over = 0.15;
+      const n0 = wide ? [xm, Math.max(NEAR, d0 - over)] : [x0 - over, dm];
+      const n1 = wide ? [xm, d1 + over] : [x1 + over, dm];
       ctx.fillStyle = 'rgba(20,24,30,0.55)';
       ctx.beginPath();
-      ctx.moveTo(sx(x0, dm), sy(top, dm)); ctx.lineTo(sx(x1, dm), sy(top, dm));
-      ctx.lineTo(sx(x1, dm), sy(top + nh, dm)); ctx.lineTo(sx(x0, dm), sy(top + nh, dm));
+      ctx.moveTo(sx(n0[0], n0[1]), sy(top, n0[1])); ctx.lineTo(sx(n1[0], n1[1]), sy(top, n1[1]));
+      ctx.lineTo(sx(n1[0], n1[1]), sy(top + nh, n1[1])); ctx.lineTo(sx(n0[0], n0[1]), sy(top + nh, n0[1]));
       ctx.closePath(); ctx.fill();
       ctx.strokeStyle = '#fff';
       ctx.lineWidth = Math.max(1, 0.02 * f / dm);
-      ctx.beginPath(); ctx.moveTo(sx(x0, dm), sy(top + nh, dm)); ctx.lineTo(sx(x1, dm), sy(top + nh, dm)); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(sx(n0[0], n0[1]), sy(top + nh, n0[1])); ctx.lineTo(sx(n1[0], n1[1]), sy(top + nh, n1[1])); ctx.stroke();
+      ctx.strokeStyle = C.legs;
+      ctx.lineWidth = Math.max(1, 0.025 * f / dm);
+      ctx.beginPath();
+      for (const [px, pd] of [n0, n1]) { ctx.moveTo(sx(px, pd), sy(top - 0.02, pd)); ctx.lineTo(sx(px, pd), sy(top + nh, pd)); }
+      ctx.stroke();
       ctx.restore();
     }
 
@@ -1670,7 +1679,8 @@
         if (it.z + len - camZ < NEAR) continue;
         let key = it.z + len * 0.5 - camZ;
         if (it.type === 'table') {
-          if (it.row != null) tableRows[it.row] = (tableRows[it.row] || 0) | (1 << it.lane);
+          // enkel heelgebleven tafels vormen samen één lange tafel
+          if (it.row != null && !it.broken) tableRows[it.row] = (tableRows[it.row] || 0) | (1 << it.lane);
           // speler boven de tafel: tafel eerst tekenen
           if ((state.y || 0) > 0.5 && it.z - 0.5 < dist && it.z + len + 0.5 > dist) key = Math.max(key, CAM_BACK + 0.01);
         }
