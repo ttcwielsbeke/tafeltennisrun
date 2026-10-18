@@ -41,13 +41,15 @@ test('een goede speler overleeft: de autopiloot haalt 3 minuten op 5 seeds', () 
   }
 });
 
-test('na 2 minuten versnelt het spel trager door, tot 30 m/s rond 6 minuten', () => {
+test('na 2 minuten versnelt het spel trager door: 30 m/s na 6, 34 m/s na 9 minuten', () => {
   const s = G.createGame('x');
   s.items = []; s.nextChunk = 1e9;
   const at = (sec) => { while (s.frame < sec * 60) G.step(s, []); return s.speed; };
   assert.ok(Math.abs(at(120) - 22) < 0.05);        // kruissnelheid na 2 minuten
   assert.ok(at(300) > 27.5 && at(300) < 28.5);
-  assert.equal(at(400), 30);                        // topsnelheid na ~6 minuten
+  assert.ok(Math.abs(at(360) - 30) < 0.1);           // 30 m/s na ~6 minuten ...
+  assert.ok(at(450) > 31.5 && at(450) < 32.5);      // ... en dan de verlengingen
+  assert.equal(at(600), 34);                        // topsnelheid na ~9 minuten
 });
 
 test('langs een baas lopen geeft 250 bonuspunten, om de 1000 m', () => {
@@ -58,6 +60,13 @@ test('langs een baas lopen geeft 250 bonuspunten, om de 1000 m', () => {
   assert.equal(bosses, 2);
   assert.equal(s.points, 500);
   assert.equal(G.scoreOf(s), Math.floor(s.dist) + 500);
+});
+
+test('niet onmogelijk: de perfecte autopiloot haalt 10 minuten op 3 banen', () => {
+  for (const seed of ['2026-10-18', '2026-10-11', 'a']) {
+    const s = runBot(seed, 60 * 600);
+    assert.ok(s.alive, seed + ': gebotst op ' + s.crashedBy + ' na ' + (s.frame / 60).toFixed(0) + ' s');
+  }
 });
 
 test('een bal is 5 punten waard: afstand blijft de hoofdzaak', () => {
@@ -135,5 +144,5 @@ test('de lus doet vaste stappen van 1/60 s, los van de beeldsnelheid', () => {
 // Dan bewust opnieuw berekenen en hier aanpassen.
 const GOLDEN = {
   script: { frame: 426, score: 73, alive: false, crashedBy: 'table' },   // onder het net door, dan tegen een tafel
-  bot: { frame: 7200, score: 2455, balls: 51, alive: true }    // spelversie 3: baas op 1 km (+250), chopper
+  bot: { frame: 7200, score: 2565, balls: 79, alive: true }    // spelversie 4: schaarsere power-ups (andere baan)
 };

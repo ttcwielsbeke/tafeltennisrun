@@ -33,10 +33,12 @@ Open `index.html` of speel online (GitHub Pages, zie onder).
   Groene noppen 1500, Clubkampioen 3000; dag- en oefenrondes tellen allebei). Kiezen doe je op het titelscherm
   met de pijltjes (of ←/→). Puur voor het oog: geen voordeel in het spel. De drempels staan in `config.js`.
 - Het wordt steeds moeilijker, zoals in Subway Surfers: de eerste 2 minuten versnel je van 10 naar 22 m/s, daarna
-  blijft het trager versnellen tot 30 m/s (~6 min). Vanaf 2 minuten worden de rijen gemengder en komen ze vlugger
-  na elkaar; een volle rij tafels of netten komt dan altijd als combinatie (springen en meteen sliden, of omgekeerd).
-  Tussen twee rijen zit altijd minstens 0,9 s.
-  Na een botsing: één tik op **Opnieuw**.
+  trager tot 30 m/s (~6 min), en in de **verlengingen** nog tot 34 m/s (~9 min). Vanaf 2 minuten worden de rijen
+  gemengder en komen ze vlugger na elkaar; een volle rij tafels of netten komt dan altijd als combinatie (springen en
+  meteen sliden, of omgekeerd). Na 6 minuten komen er nog meer choppers met een noppenspeler ernaast.
+  Tussen twee rijen zit altijd minstens 0,9 s. Na een botsing: één tik op **Opnieuw**.
+- **Power-ups worden schaarser** naarmate je verder loopt: van 1 op 8 rijen bij de start tot 1 op 16 na 6 minuten.
+  Vooral schilden: laat in de run is een fout echt een fout.
 - **Oefenen** gebruikt een willekeurige baan en telt niet mee voor de ranglijst.
 - Geluid staat standaard uit (knop rechtsboven); je keuze wordt onthouden. Alles is gesynthetiseerd: sneakerpiep
   bij een slide, een echte "pok" per bal (na elkaar gepakt klimt de toon), het fluitje van de scheidsrechter bij

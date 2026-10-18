@@ -156,11 +156,11 @@ test('kromming en draaiing kloppen: na de bocht is de hal precies angle gedraaid
 
 /* ---------- moeilijkheid die blijft stijgen ---------- */
 
-test('verwachte snelheid: 10 m/s bij de start, 22 na ~1,9 km, nooit boven 30', () => {
+test('verwachte snelheid: 10 m/s bij de start, 22 na ~1,9 km, nooit boven 34', () => {
   assert.equal(W.expectedSpeed(0), 10);
   assert.ok(Math.abs(W.expectedSpeed(1920) - 22) < 0.05);     // kruissnelheid na ~2 min
   assert.ok(W.expectedSpeed(6000) > 22 && W.expectedSpeed(6000) < 30);
-  assert.equal(W.expectedSpeed(20000), 30);
+  assert.equal(W.expectedSpeed(30000), 34);
   for (let z = 0; z < 15000; z += 250) assert.ok(W.expectedSpeed(z + 250) >= W.expectedSpeed(z));
 });
 
@@ -203,12 +203,13 @@ test('later wordt het drukker: kortere tijd tussen rijen en combinatierijen', ()
 // Een bot met vaste reactietijd maakt op een eerlijke baan nooit een fout, hoe snel ook:
 // "hoe lang overleeft een mens" kunnen we niet eerlijk testen. Wel meetbaar: het spel wordt
 // sneller, rijen komen vlugger na elkaar, en de rijen worden gemengder.
-test('na 6 minuten: sneller, rijen dicht op elkaar en vaker gemengd dan na 2 minuten', () => {
+test('na 6 minuten: sneller, rijen dicht op elkaar en vaker moeilijk (gemengd of chopper) dan na 2 minuten', () => {
   const stats = (seed, z0, z1) => {
     const rows = [];
     for (let i = Math.floor(z0 / W.CHUNK_LEN); i <= Math.ceil(z1 / W.CHUNK_LEN); i++) rows.push(...W.rowsOf(W.generateChunk(seed, i)));
     const inRange = rows.filter((r) => r.z >= z0 && r.z < z1);
-    const mixed = inRange.filter((r) => new Set(r.lanes.filter(Boolean)).size > 1).length / inRange.length;
+    // moeilijke rij = gemengd (meer dan één soort) of met een chopper: beide dwingen een keuze af
+    const mixed = inRange.filter((r) => new Set(r.lanes.filter(Boolean)).size > 1 || r.lanes.includes('chopper')).length / inRange.length;
     return { mixed, perSecond: inRange.length / ((z1 - z0) / W.expectedSpeed((z0 + z1) / 2)) };
   };
   for (const seed of SEEDS) {
@@ -316,6 +317,69 @@ test('om de 1000 m een baas: 5 rijen, enkel baasrijen in dat stuk, telkens moeil
       if (k >= 2) assert.ok(hasChopper, 'baas ' + k + ' heeft een chopper');
       if (k >= 3) assert.ok(hasCombo, 'baas ' + k + ' heeft een combinatie');
       for (const r of boss) assert.ok(W.isRowSafe(r));
+    }
+  }
+});
+
+/* ---------- versie 4: schaarse power-ups en verlengingen na 6 minuten ---------- */
+
+// afstand waarop je na t seconden bent (bij de verwachte snelheid)
+function zAt(t) {
+  let lo = 0, hi = 30000;
+  for (let i = 0; i < 60; i++) { const m = (lo + hi) / 2; if (W.expectedTime(m) < t) lo = m; else hi = m; }
+  return lo;
+}
+const OVER = 140;   // stukken: ruim voorbij 9 minuten
+function perMinute(seed, t0, t1, pick) {
+  const z0 = zAt(t0), z1 = zAt(t1);
+  let n = 0;
+  for (let i = Math.floor(z0 / W.CHUNK_LEN); i <= Math.ceil(z1 / W.CHUNK_LEN); i++) {
+    for (const it of W.generateChunk(seed, i)) if (it.z >= z0 && it.z < z1 && pick(it)) n++;
+  }
+  return n / ((t1 - t0) / 60);
+}
+
+test('power-ups worden schaarser: laat hoogstens ~4 per minuut, schilden hoogstens ~0,6', () => {
+  const pu = new Set(['shield', 'magnet', 'timeout', 'bak']);
+  let all = 0, shields = 0, early = 0;
+  for (const seed of SEEDS) {
+    all += perMinute(seed, 360, 540, (it) => pu.has(it.type));
+    shields += perMinute(seed, 360, 540, (it) => it.type === 'shield');
+    early += perMinute(seed, 60, 180, (it) => pu.has(it.type));
+  }
+  all /= SEEDS.length; shields /= SEEDS.length; early /= SEEDS.length;
+  assert.ok(all <= 4, 'te veel power-ups laat: ' + all.toFixed(1) + '/min');
+  assert.ok(shields <= 0.6, 'te veel schilden laat: ' + shields.toFixed(2) + '/min');
+  assert.ok(early > all, 'vroeg meer power-ups dan laat');
+});
+
+test('verlengingen: tussen minuut 6 en 9 wordt het nog steeds moeilijker', () => {
+  assert.ok(W.expectedSpeed(zAt(540)) > W.expectedSpeed(zAt(360)) * 1.08, 'niet sneller na 6 minuten');
+  let pairs67 = 0, pairs89 = 0;
+  const chopWithNopper = (seed, t0, t1) => {
+    const z0 = zAt(t0), z1 = zAt(t1), rows = [];
+    for (let i = Math.floor(z0 / W.CHUNK_LEN); i <= Math.ceil(z1 / W.CHUNK_LEN); i++) rows.push(...W.rowsOf(W.generateChunk(seed, i)));
+    return rows.filter((r) => r.z >= z0 && r.z < z1 && r.lanes.includes('chopper') && r.lanes.includes('nopper')).length;
+  };
+  for (const seed of SEEDS) {
+    pairs67 += chopWithNopper(seed, 360, 420);
+    pairs89 += chopWithNopper(seed, 480, 540);
+  }
+  assert.ok(pairs89 > pairs67, 'niet meer chopper+noppenspeler-rijen: ' + pairs67 + ' → ' + pairs89);
+});
+
+test('vanaf de 7e baas: minstens twee choppers en een combinatie', () => {
+  const full = (l, t) => l.every((x) => x === t);
+  for (const seed of SEEDS) {
+    const items = [];
+    for (let i = 0; i < OVER; i++) items.push(...W.generateChunk(seed, i));
+    const rows = W.rowsOf(items);
+    for (let k = 7; k <= 12; k++) {
+      const boss = rows.filter((r) => items.some((it) => it.row === r.row && it.boss === k));
+      assert.equal(boss.length, 5, seed + ' baas ' + k);
+      const choppers = items.filter((it) => it.boss === k && it.type === 'chopper').length;
+      assert.ok(choppers >= 2, seed + ' baas ' + k + ': ' + choppers + ' choppers');
+      assert.ok(boss.some((r, i) => i > 0 && ((full(boss[i - 1].lanes, 'table') && full(r.lanes, 'net')) || (full(boss[i - 1].lanes, 'net') && full(r.lanes, 'table')))));
     }
   }
 });

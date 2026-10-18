@@ -24,14 +24,16 @@
     },
 
     game: {
-      version: 3,            // spelversie: verhogen bij elke wijziging aan spellogica of baan
+      version: 4,            // spelversie: verhogen bij elke wijziging aan spellogica of baan
 
       /* snelheid in meter per seconde */
       startSpeed: 10,
       accel: 0.1,            // m/s erbij per seconde lopen, tot cruiseSpeed (~2 min)
       cruiseSpeed: 22,
       lateAccel: 0.0333,     // daarna trager verder versnellen ...
-      maxSpeed: 30,          // ... tot hier (~6 min). Onder de 40 m/s van de ranglijst-check blijven!
+      lateSpeed: 30,         // ... tot hier (~6 min) ...
+      overAccel: 0.0222,     // ... en in de verlengingen nog wat verder ...
+      maxSpeed: 34,          // ... tot hier (~9 min). Onder de 40 m/s van de ranglijst-check blijven!
 
       /* springen en sliden */
       jumpVel: 9,            // m/s omhoog bij de sprong (0,8 s in de lucht)

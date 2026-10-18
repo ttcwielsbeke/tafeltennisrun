@@ -30,35 +30,43 @@
      tot ~0,5 m/s). De rijen komen dan iets vlugger; de marge tussen MIN_ROW_TIME
      (0,9 s) en een sprong (0,82 s) vangt dat op.
      Math.sqrt is exact afgerond (IEEE 754): overal gelijk. */
+  // drie fasen: tot kruissnelheid, tot lateSpeed, en de verlengingen tot maxSpeed
   function speedPhases() {
-    const v0 = CFG.startSpeed, a1 = CFG.accel, vc = CFG.cruiseSpeed, a2 = CFG.lateAccel, vm = CFG.maxSpeed;
+    const v0 = CFG.startSpeed, a1 = CFG.accel, vc = CFG.cruiseSpeed, a2 = CFG.lateAccel, vl = CFG.lateSpeed,
+      a3 = CFG.overAccel, vm = CFG.maxSpeed;
     const z1 = (vc * vc - v0 * v0) / (2 * a1);
-    const z2 = z1 + (vm * vm - vc * vc) / (2 * a2);
-    return { v0, a1, vc, a2, vm, z1, z2 };
+    const z2 = z1 + (vl * vl - vc * vc) / (2 * a2);
+    const z3 = z2 + (vm * vm - vl * vl) / (2 * a3);
+    return { v0, a1, vc, a2, vl, a3, vm, z1, z2, z3 };
   }
   function expectedSpeed(z) {
     const p = speedPhases();
     if (z <= p.z1) return Math.sqrt(p.v0 * p.v0 + 2 * p.a1 * z);
-    if (z >= p.z2) return p.vm;
-    return Math.sqrt(p.vc * p.vc + 2 * p.a2 * (z - p.z1));
+    if (z <= p.z2) return Math.sqrt(p.vc * p.vc + 2 * p.a2 * (z - p.z1));
+    if (z >= p.z3) return p.vm;
+    return Math.sqrt(p.vl * p.vl + 2 * p.a3 * (z - p.z2));
   }
   // seconden sinds de start, bij die verwachte snelheid
   function expectedTime(z) {
     const p = speedPhases(), v = expectedSpeed(z);
     if (z <= p.z1) return (v - p.v0) / p.a1;
     const t1 = (p.vc - p.v0) / p.a1;
-    if (z < p.z2) return t1 + (v - p.vc) / p.a2;
-    return t1 + (p.vm - p.vc) / p.a2 + (z - p.z2) / p.vm;
+    if (z <= p.z2) return t1 + (v - p.vc) / p.a2;
+    const t2 = t1 + (p.vl - p.vc) / p.a2;
+    if (z < p.z3) return t2 + (v - p.vl) / p.a3;
+    return t2 + (p.vm - p.vl) / p.a3 + (z - p.z3) / p.vm;
   }
   // 'laat' = 0 tot 2 minuten, dan oplopend tot 1 na 5 minuten: drukker, moeilijkere patronen, combinaties
   function lateness(z) { return clamp01((expectedTime(z) - 120) / 180); }
+  // 'verlengingen' = 0 tot 6 minuten, dan oplopend tot 1 na 9 minuten: het blijft moeilijker worden
+  function overtime(z) { return clamp01((expectedTime(z) - 360) / 180); }
   // minimale afstand tussen rijen bij snelheid v (+0,15 m: afronding van z op 0,1 m)
   function minGap(v) { return Math.max(MIN_ROW_GAP, v * MIN_ROW_TIME + 0.15); }
   const round1 = (v) => Math.round(v * 10) / 10;
 
   // Rij-patronen: [type baan 0, baan 1, baan 2], null = vrij.
   // 'min' = vanaf welke moeilijkheid (0..1) het patroon mag komen.
-  function rowPattern(rng, d, late) {
+  function rowPattern(rng, d, late, ot) {
     const L = rng.int(3);
     const others = [0, 1, 2].filter((l) => l !== L);
     const lanes = [null, null, null];
@@ -72,12 +80,12 @@
       { w: 3, min: 0.3, make() { lanes[L] = 'nopper'; for (const o of others) lanes[o] = 'net'; } },
       // chopper: een verdediger die opschuift naar een buurbaan (pas na 2 minuten). De baan waar hij
       // vertrekt is vrij als je er bent; soms staat er in de derde baan nog een noppenspeler.
-      { w: 0.5 + 3 * late, min: 0.4, late: true, make() {    // steeds vaker naarmate je verder loopt
+      { w: 0.5 + 3 * late + 2 * ot, min: 0.4, late: true, make() {    // steeds vaker naarmate je verder loopt
           const to = L === 1 ? (rng.chance(0.5) ? 0 : 2) : 1;
           lanes[to] = 'chopper';
           lanes.chopperFrom = L;
           const third = 3 - L - to;
-          if (rng.chance(0.5 * late)) lanes[third] = 'nopper';
+          if (rng.chance(0.5 * late + 0.5 * ot)) lanes[third] = 'nopper';
         } },
       { w: 3, min: 0.4, make() {
           const kinds = ['nopper', 'table', 'net', 'machine', null];
@@ -181,7 +189,7 @@
     else if (k === 2) rows = [two(), chop(false), all('table'), mixed('net'), two()];
     else {
       const first = rng.chance(0.5) ? 'table' : 'net';
-      rows = [two(), chop(true), all(first), all(first === 'table' ? 'net' : 'table'), k >= 5 ? chop(true) : mixed('table')];
+      rows = [k >= 7 ? chop(true) : two(), chop(true), all(first), all(first === 'table' ? 'net' : 'table'), k >= 5 ? chop(true) : mixed('table')];
     }
     const last = zs[BOSS_ROWS - 1];
     return { k, at, rows: rows.map((lanes, i) => ({ z: zs[i], lanes })),
@@ -199,7 +207,29 @@
     for (let l = 0; l < 3 && count() > 1; l++) if (lanes[l] === 'chopper') lanes[l] = null;
   }
 
+  /* Stukken van 120 m. Vroeg staat elk stuk op zichzelf: een halve minimale afstand van elke rand.
+     Laat (na 2 minuten) gaat een stuk verder waar het vorige stopte: bij hoge snelheid duurt een stuk
+     maar enkele seconden en zou een lege rand aan elke grens de baan merkbaar luchtiger maken.
+     Daarvoor onthouden we per stuk waar de volgende rij zou komen (kleine cache, puur en deterministisch). */
+  const memo = new Map();
+  const MEMO_MAX = 400;
+  // eerste rij van een stuk dat op zichzelf staat (de eerste trekking van zijn eigen random-stroom)
+  function ownFirst(seed, j, r) {
+    const s0 = j * CHUNK_LEN;
+    return j === 0 ? START_FREE + r * 6 : s0 + minGap(expectedSpeed(s0)) / 2 + r * 6;
+  }
+  function chunkNextZ(seed, j) {
+    const key = seed + '#' + j;
+    if (!memo.has(key)) buildChunk(seed, j);
+    return memo.get(key).nextZ;
+  }
   function generateChunk(seed, index) {
+    const key = seed + '#' + index;
+    if (!memo.has(key)) buildChunk(seed, index);
+    return memo.get(key).items.map((it) => Object.assign({}, it));
+  }
+
+  function buildChunk(seed, index) {
     const rng = makeRng(seed + '#' + index);
     const corners = cornersOf(seed, index);
     const d = Math.min(1, index / 12);           // moeilijkheid: na ~1,4 km op het maximum
@@ -211,8 +241,16 @@
 
     // rijen op minstens MIN_ROW_GAP van elkaar, ook over de grens tussen twee stukken
     // aan elke stukgrens telt de helft van de minimale afstand bij de snelheid daar
-    let z = start + (index === 0 ? START_FREE : minGap(expectedSpeed(start)) / 2) + rng.next() * 6;
-    const endHalf = minGap(expectedSpeed(end)) / 2;
+    // (laat geen willekeurige extra marge meer: bij hoge snelheid duurt een stuk maar enkele seconden)
+    const r0 = rng.next();
+    // gaat dit stuk verder waar het vorige stopte? (laat) Gaat het volgende stuk verder waar dit stopt?
+    const continues = index > 0 && lateness((index - 1) * CHUNK_LEN) > 0;
+    const handsOver = lateness(start) > 0;
+    let z = continues ? chunkNextZ(seed, index - 1) : ownFirst(seed, index, r0);
+    // rijen tot hier; bij doorgeven mag de laatste tot vlak voor de rand, anders een halve afstand ervan
+    const lastZ = handsOver ? end - 1e-6 : end - minGap(expectedSpeed(end)) / 2;
+    // de eerste rij van het volgende stuk (enkel als dat op zichzelf staat), voor ballen en power-ups
+    const nextFirst = handsOver ? Infinity : ownFirst(seed, index + 1, makeRng(seed + '#' + (index + 1)).next());
     let forced = null;                           // tweede rij van een combinatie
     const bosses = bossesNear(seed, start, end);
     const zoneAt = (zz) => bosses.find((b) => zz > b.zoneStart && zz < b.zoneEnd);
@@ -236,11 +274,11 @@
       });
     }
     if (zoneAt(z)) z = zoneAt(z).zoneEnd;
-    while (z <= end - endHalf) {
+    while (z <= lastZ) {
       const rowZ = round1(z);
       const row = index + ':' + rowZ;
-      const v = expectedSpeed(rowZ), late = lateness(rowZ);
-      const lanes = forced ? [forced, forced, forced] : rowPattern(rng, d, late);
+      const v = expectedSpeed(rowZ), late = lateness(rowZ), ot = overtime(rowZ);
+      const lanes = forced ? [forced, forced, forced] : rowPattern(rng, d, late, ot);
       const wasForced = !!forced;
       forced = null;
       // laat in de run is een volle rij tafels of netten nooit gratis: meteen de omgekeerde erachter
@@ -249,7 +287,7 @@
       let comboNext = null;
       const full = lanes[0] === lanes[1] && lanes[1] === lanes[2] && (lanes[0] === 'table' || lanes[0] === 'net');
       if (late > 0 && full && !wasForced) {
-        if (z + minGap(v) <= end - endHalf && !zoneAt(z + minGap(v))) comboNext = lanes[0] === 'table' ? 'net' : 'table';
+        if (z + minGap(v) <= lastZ && !zoneAt(z + minGap(v))) comboNext = lanes[0] === 'table' ? 'net' : 'table';
         else lanes[1] = 'nopper';
       }
       // in een bocht hoogstens één noppenspeler: twee veilige banen, de bocht leest al moeilijk genoeg
@@ -262,9 +300,10 @@
       // afstand tot de volgende rij: eerst in meter zoals altijd, later in tijd bij de verwachte snelheid
       const r = rng.next();
       let gap = Math.max(MIN_ROW_GAP, lerp(30, 19, d) + r * lerp(14, 6, d));
-      // laat: 0,95..1,30 keer een doeltijd die van 0,93 s naar 0,83 s zakt (~0,79..1,08 s op het einde,
-      // gemiddeld ~1,0 s); de vloer van 0,9 s is het minimum, niet de regel
-      if (late > 0) gap = v * lerp(0.93, 0.83, late) * (0.95 + 0.35 * r);
+      // laat: 1,0..1,3 keer een doeltijd die van 0,93 s naar 0,83 s zakt (~0,83..1,08 s op het einde,
+      // gemiddeld ~0,95 s); de vloer van 0,9 s is het minimum, niet de regel. In de verlengingen
+      // (6 tot 9 minuten) zakt de doeltijd nog 5%.
+      if (late > 0) gap = v * lerp(0.93, 0.83, late) * lerp(1, 0.95, ot) * (1.0 + 0.3 * r);
       // combinatie: springen en meteen sliden (of omgekeerd), op de kortste veilige afstand
       if (comboNext) {
         forced = comboNext;
@@ -272,7 +311,7 @@
       }
       gap = Math.max(gap, minGap(v));
       // ballen en power-ups blijven voor de eerstvolgende baasrij
-      const itemGap = Math.min(gap, nextBossRow(rowZ) - rowZ - 1);
+      const itemGap = Math.min(gap, nextBossRow(rowZ) - rowZ - 1, nextFirst - rowZ - 1);
 
       // een bal boven een tafel, voor wie durft te springen
       const tableLane = lanes.indexOf('table');
@@ -293,10 +332,15 @@
       }
 
       // af en toe een power-up, midden tussen twee rijen, in een andere baan dan de ballen
+      // power-ups worden schaarser: 1 op 8 rijen bij de start, 1 op 16 na 6 minuten.
+      // Schilden het meest: een fout moet iets kosten.
       const p = rng.next();
-      if (p < 0.2 && index > 0) {
+      const tRow = expectedTime(rowZ), scarce = clamp01(tRow / 360);
+      const chance = lerp(0.125, 0.0625, scarce);
+      if (p < chance && index > 0) {
         const lane = (ballLane + 1 + rng.int(2)) % 3;
-        const type = p < 0.055 ? 'shield' : p < 0.11 ? 'magnet' : p < 0.155 ? 'timeout' : 'bak';
+        const u = p / chance, sh = lerp(0.25, 0.12, scarce), rest = (1 - sh) / 3;
+        const type = u < sh ? 'shield' : u < sh + rest ? 'magnet' : u < sh + 2 * rest ? 'timeout' : 'bak';
         add({ type, lane, z: round1(rowZ + itemGap / 2), len: LEN[type] });
       }
 
@@ -305,7 +349,8 @@
     }
 
     items.sort((a, b) => a.z - b.z || a.lane - b.lane);
-    return items;
+    if (memo.size >= MEMO_MAX) memo.delete(memo.keys().next().value);
+    memo.set(seed + '#' + index, { items, nextZ: z });
   }
 
   // groepeer obstakels per rij: { row, z, lanes: [type|null ×3] }
