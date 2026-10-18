@@ -14,8 +14,11 @@
   const FEET_FRAC = 0.84;      // voeten van de speler op 84% van de hoogte
   const HORIZON_FRAC = 0.32;   // gewenste horizon (32% van boven)
   const LANE_FRAC_W = 0.28;    // baanbreedte bij de speler, als deel van de breedte (portret)
-  const LANE_FRAC_H = 0.36;    // ... maar nooit meer dan dit deel van de hoogte (landschap)
-  const CAM_H_MIN = 2.2, CAM_H_MAX = 5.5;
+  const LANE_FRAC_H = 0.24;    // ... maar nooit meer dan dit deel van de hoogte (landschap)
+  /* Een lage camera zet de speler voor de obstakels in zijn eigen baan: op hoogte h
+     zie je de vloer pas vanaf 5·h/(h − 1,85) m achter de camera. Bij 3,8 m is dat
+     ~10 m: wat 5 m voor je staat, zie je boven het hoofd van de speler. */
+  const CAM_H_MIN = 3.8, CAM_H_MAX = 5.5;
   const VIEW_AHEAD = 72;       // zo ver vooruit tekenen
   const VIEW_BEHIND = 2;       // zo ver achter de speler nog tekenen
   const FADE_FROM = 55;        // vanaf deze diepte vervagen items
@@ -55,6 +58,7 @@
     kampioen: { shirt: '#e0b520', trim: '#fff6c8', hem: '#a88410', shorts: '#111111',
                 stripes: ['#e4474c', '#161616', '#2eb1c2'], bat: C.red }
   };
+  const OUTLINE = '#0a1424';   // donkere rand rond figuren
   const HUD_FONT = '"Press Start 2P", monospace';
 
   function hash(n) {
@@ -68,8 +72,16 @@
     let W = 0, H = 0, dpr = 1, cssW = -1, cssH = -1;
     // camera
     let f = 1, camH = 3, cx = 0, hy = 0;
-    let fogGrad = null;
-    let bg = null, bgKey = '';
+    let fogGrad = null, floorGrad = null, vignette = null;
+    let bg = null, bgKey = '', fontKey = 0;
+    // het pixellettertype komt later binnen: dan het panorama opnieuw schilderen
+    try {
+      const doc = canvas.ownerDocument;
+      if (doc && doc.fonts && doc.fonts.ready) {
+        doc.fonts.ready.then(() => { fontKey++; });
+        if (doc.fonts.addEventListener) doc.fonts.addEventListener('loadingdone', () => { fontKey++; });
+      }
+    } catch (e) { /* geen fonts-api */ }
     let kit = KITS.club;    // tenue van de speler
     const list = [];        // hergebruikte tekenlijst
     const tableRows = {};   // row -> bitmasker van banen met tafel
@@ -85,6 +97,12 @@
       fogGrad = ctx.createLinearGradient(0, hy, 0, hy + (H - hy) * 0.22);
       fogGrad.addColorStop(0, 'rgba(26,60,110,0.6)');
       fogGrad.addColorStop(1, 'rgba(26,60,110,0)');
+      floorGrad = ctx.createLinearGradient(0, hy, 0, H);
+      floorGrad.addColorStop(0, C.floorD);
+      floorGrad.addColorStop(1, C.floor);
+      vignette = ctx.createRadialGradient(cx, H * 0.55, Math.min(W, H) * 0.35, cx, H * 0.55, Math.hypot(W, H) * 0.62);
+      vignette.addColorStop(0, 'rgba(2,19,43,0)');
+      vignette.addColorStop(1, 'rgba(2,19,43,0.38)');
     }
 
     function resize() {
@@ -111,77 +129,154 @@
       return null;
     }
 
-    function paintHall(g) {
-      // plafond
+    /* Panorama van de hal: plafond en muur, P pixels breed (P > W) zodat elk
+       herkenningspunt maar één keer voorkomt. Alles wat over de volle breedte
+       loopt, is periodiek met P: de naad valt nooit op. Wat op de vloer staat,
+       hoort hier niet: dat zou in een bocht over de baan schuiven. */
+    function paintHall(g, P) {
       const ceil = hy * 0.22;
-      g.fillStyle = C.ink;
-      g.fillRect(0, 0, W, ceil);
-      g.fillStyle = 'rgba(158,212,255,0.85)';
-      const nl = Math.max(3, Math.round(W / 140));
-      for (let i = 0; i < nl; i++) {
-        const lx = (i + 0.5) * W / nl;
-        g.fillRect(lx - W * 0.035, ceil * 0.45, W * 0.07, Math.max(3, ceil * 0.18));
+      // plafond met vakwerkspanten
+      const cg = g.createLinearGradient(0, 0, 0, ceil);
+      cg.addColorStop(0, '#010a18');
+      cg.addColorStop(1, C.ink);
+      g.fillStyle = cg;
+      g.fillRect(0, 0, P, ceil);
+      const nt = Math.max(8, Math.round(P / 56)), tw = P / nt;
+      g.strokeStyle = 'rgba(158,212,255,0.09)';
+      g.lineWidth = 1;
+      g.beginPath();
+      g.moveTo(0, ceil * 0.3); g.lineTo(P, ceil * 0.3);
+      for (let i = 0; i < nt; i++) {
+        const x = i * tw;
+        g.moveTo(x, ceil); g.lineTo(x + tw / 2, ceil * 0.3); g.lineTo(x + tw, ceil);
       }
+      g.stroke();
+
       // muur in clubblauw
       const wall = g.createLinearGradient(0, ceil, 0, hy);
       wall.addColorStop(0, C.blueDD);
       wall.addColorStop(1, C.blueD);
       g.fillStyle = wall;
-      g.fillRect(0, ceil, W, hy - ceil);
+      g.fillRect(0, ceil, P, hy - ceil);
+
+      // hoge ramen: daglicht, in een band net onder het plafond
+      const winH = Math.max(4, hy * 0.075), winY = ceil + hy * 0.03;
+      const nw = Math.max(4, Math.round(P / 150)), ww = P / nw;
+      const wg = g.createLinearGradient(0, winY, 0, winY + winH);
+      wg.addColorStop(0, 'rgba(200,232,255,0.55)');
+      wg.addColorStop(1, 'rgba(120,180,240,0.25)');
+      for (let i = 0; i < nw; i++) {
+        const x = i * ww + ww * 0.12;
+        g.fillStyle = wg;
+        g.fillRect(x, winY, ww * 0.76, winH);
+        g.fillStyle = 'rgba(6,42,86,0.9)';
+        for (let k = 1; k < 4; k++) g.fillRect(x + ww * 0.76 * k / 4 - 0.5, winY, 1, winH);
+      }
+
       // muurpanelen
-      g.strokeStyle = 'rgba(158,212,255,0.12)';
+      g.strokeStyle = 'rgba(158,212,255,0.10)';
       g.lineWidth = 1;
       g.beginPath();
-      const np = Math.max(4, Math.round(W / 90));
-      for (let i = 1; i < np; i++) { const x = Math.round(i * W / np) + 0.5; g.moveTo(x, ceil); g.lineTo(x, hy); }
+      const np = Math.max(6, Math.round(P / 90));
+      for (let i = 0; i < np; i++) { const x = Math.round(i * P / np) + 0.5; g.moveTo(x, winY + winH + 3); g.lineTo(x, hy); }
       g.stroke();
       // plint met gouden bies
       const plTop = hy - hy * 0.09;
       g.fillStyle = C.blueM;
-      g.fillRect(0, plTop, W, hy * 0.09);
+      g.fillRect(0, plTop, P, hy * 0.09);
       g.fillStyle = C.gold;
-      g.fillRect(0, plTop, W, Math.max(1, hy * 0.012));
-
-      // scorebord
-      const sw = clamp(W * 0.3, 90, 260), sh = sw * 0.42;
-      const sx = W * 0.5 - sw / 2, sy = ceil + (hy * 0.91 - ceil) * 0.42 - sh / 2;
-      g.fillStyle = C.chrome;
-      g.fillRect(sx - 3, sy - 3, sw + 6, sh + 6);
-      g.fillStyle = C.ink;
-      g.fillRect(sx, sy, sw, sh);
-      g.textAlign = 'center';
-      g.textBaseline = 'middle';
-      g.font = 'bold ' + Math.round(sh * 0.2) + 'px system-ui, sans-serif';
-      g.fillStyle = C.chrome;
-      g.fillText('THUIS', sx + sw * 0.25, sy + sh * 0.2);
-      g.fillText('GAST', sx + sw * 0.75, sy + sh * 0.2);
-      g.font = 'bold ' + Math.round(sh * 0.48) + 'px ui-monospace, monospace';
-      g.fillStyle = C.gold;
-      g.fillText('11', sx + sw * 0.25, sy + sh * 0.62);
-      g.fillStyle = '#ff4a3d';
-      g.fillText('9', sx + sw * 0.75, sy + sh * 0.62);
-      g.fillStyle = C.gold;
-      g.fillText(':', sx + sw * 0.5, sy + sh * 0.6);
-
-      // clubbanner onder het scorebord
-      const bTop = sy + sh + 3, bAvail = plTop - bTop;
-      const banW = W * 0.5;
-      const banFs = Math.min(banW / (20 * 0.66), bAvail * 0.45);
-      if (banFs >= 7) {
-        const banH = banFs * 1.7, banY = bTop + (bAvail - banH) / 2;
-        g.fillStyle = C.ink;
-        g.fillRect(W * 0.25, banY, banW, banH);
-        g.fillStyle = C.gold;
-        g.fillRect(W * 0.25, banY, banW, Math.max(1, banH * 0.08));
-        g.fillRect(W * 0.25, banY + banH * 0.92, banW, Math.max(1, banH * 0.08));
-        g.font = 'bold ' + Math.floor(banFs) + 'px system-ui, sans-serif';
-        g.fillStyle = C.white;
-        g.fillText('TTC WIELSBEKE-SPOTIT', W * 0.5, banY + banH * 0.53, banW * 0.94);
+      g.fillRect(0, plTop, P, Math.max(1, hy * 0.012));
+      // reclameborden op de plint, periodiek
+      const na = Math.max(4, Math.round(P / 110)), aw = P / na;
+      for (let i = 0; i < na; i++) {
+        g.fillStyle = i % 2 ? 'rgba(200,36,42,0.55)' : 'rgba(2,19,43,0.45)';
+        g.fillRect(i * aw + aw * 0.08, plTop + hy * 0.025, aw * 0.84, hy * 0.05);
       }
 
-      // ventilator rechts aan de muur
-      const fr = clamp(hy * 0.13, 10, 46);
-      const fx = W * 0.88, fy = ceil + fr * 1.6;
+      // ---- herkenningspunten, elk één keer ----
+      const midY = ceil + (plTop - ceil) * 0.5;
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+
+      // scorebord (LED-cijfers in het pixellettertype van de HUD)
+      // op maat van de muur, niet van de breedte: in landschap is de muur laag
+      const wallH = plTop - winY - winH;
+      const sw = clamp(Math.min(W * 0.3, wallH * 1.15), 60, 260), sh = sw * 0.42;
+      const sx0 = W * 0.5 - sw / 2, sy0 = winY + winH + wallH * 0.36 - sh / 2;
+      g.fillStyle = C.chrome;
+      g.fillRect(sx0 - 3, sy0 - 3, sw + 6, sh + 6);
+      g.fillStyle = C.ink;
+      g.fillRect(sx0, sy0, sw, sh);
+      g.font = 'bold ' + Math.round(sh * 0.17) + 'px system-ui, sans-serif';
+      g.fillStyle = C.chrome;
+      g.fillText('THUIS', sx0 + sw * 0.25, sy0 + sh * 0.2);
+      g.fillText('GAST', sx0 + sw * 0.75, sy0 + sh * 0.2);
+      g.font = Math.round(sh * 0.36) + 'px ' + HUD_FONT;
+      g.fillStyle = C.gold;
+      g.fillText('11', sx0 + sw * 0.25, sy0 + sh * 0.64);
+      g.fillStyle = '#ff4a3d';
+      g.fillText('9', sx0 + sw * 0.75, sy0 + sh * 0.64);
+      g.fillStyle = C.gold;
+      g.fillText(':', sx0 + sw * 0.5, sy0 + sh * 0.62);
+
+      // clubbanner onder het scorebord
+      banner(g, W * 0.5, sy0 + sh + 3, plTop, W * 0.5, 'TTC WIELSBEKE-SPOTIT', C.ink, C.gold, C.white);
+
+      // ventilator
+      const fr = clamp(Math.min(hy * 0.13, wallH * 0.3), 8, 46);
+      fan(g, W * 0.88, winY + winH + fr * 1.3, fr);
+
+      // clubvlag: zwart met de drie strepen
+      flag(g, W * 0.1, midY, clamp(Math.min(W * 0.12, wallH * 0.9), 26, 120));
+
+      // klok
+      const kr = clamp(Math.min(hy * 0.1, wallH * 0.22), 7, 36);
+      clock(g, W * 1.18, winY + winH + kr * 1.6, kr);
+
+      // tweede banner
+      banner(g, W * 1.55, midY - hy * 0.08, plTop, W * 0.55, 'EINDELOOS SMASHEN', C.red, C.white, C.white);
+
+      // vlaggetjeslijn in de clubstrepen
+      const gx0 = W * 1.92, gx1 = Math.min(P - 6, W * 2.34), gy = winY + winH + hy * 0.05;
+      const sag = hy * 0.05, nflag = Math.max(5, Math.round((gx1 - gx0) / 16));
+      g.strokeStyle = 'rgba(244,244,244,0.7)'; g.lineWidth = 1;
+      g.beginPath();
+      for (let i = 0; i <= 20; i++) {
+        const t = i / 20, x = gx0 + (gx1 - gx0) * t, y = gy + sag * 4 * t * (1 - t);
+        if (i) g.lineTo(x, y); else g.moveTo(x, y);
+      }
+      g.stroke();
+      const fs = (gx1 - gx0) / nflag;
+      for (let i = 0; i < nflag; i++) {
+        const t = (i + 0.5) / nflag, x = gx0 + (gx1 - gx0) * t, y = gy + sag * 4 * t * (1 - t);
+        g.fillStyle = i % 4 === 3 ? C.white : CLUB.stripes[i % 4];
+        g.beginPath(); g.moveTo(x - fs * 0.38, y); g.lineTo(x + fs * 0.38, y); g.lineTo(x, y + fs * 0.9); g.closePath(); g.fill();
+      }
+      // tweede vlag: de PIPS OUT!-noppen
+      const bw = clamp(Math.min(W * 0.1, wallH * 0.8), 24, 100), bh = bw * 0.5, bx = W * 2.05, by = midY + hy * 0.06;
+      g.fillStyle = PIPS.shirt; g.fillRect(bx, by, bw, bh);
+      g.fillStyle = PIPS.pips[0];
+      for (let r = 0; r < 3; r++) for (let c = 0; c < 6; c++) {
+        g.beginPath(); g.arc(bx + bw * (c + 0.5 + (r % 2) * 0.5) / 6.5, by + bh * (r + 0.5) / 3, bh * 0.08, 0, Math.PI * 2); g.fill();
+      }
+    }
+
+    function banner(g, mx, top, bottom, w, text, bgc, rule, ink) {
+      const avail = bottom - top;
+      const fs = Math.min(w / (text.length * 0.66), avail * 0.45);
+      if (fs < 7) return;
+      const h = fs * 1.7, y = top + (avail - h) / 2;
+      g.fillStyle = bgc;
+      g.fillRect(mx - w / 2, y, w, h);
+      g.fillStyle = rule;
+      g.fillRect(mx - w / 2, y, w, Math.max(1, h * 0.08));
+      g.fillRect(mx - w / 2, y + h * 0.92, w, Math.max(1, h * 0.08));
+      g.font = 'bold ' + Math.floor(fs) + 'px system-ui, sans-serif';
+      g.fillStyle = ink;
+      g.fillText(text, mx, y + h * 0.53, w * 0.94);
+    }
+
+    function fan(g, fx, fy, fr) {
       g.fillStyle = '#26364f';
       g.beginPath(); g.arc(fx, fy, fr, 0, Math.PI * 2); g.fill();
       g.fillStyle = C.chrome;
@@ -195,71 +290,66 @@
       g.beginPath(); g.arc(fx, fy, fr, 0, Math.PI * 2); g.stroke();
       g.fillStyle = C.ink;
       g.beginPath(); g.arc(fx, fy, fr * 0.15, 0, Math.PI * 2); g.fill();
+    }
 
-      // clubvlag links: zwart met de drie strepen
-      const bw = clamp(W * 0.12, 30, 120), bh = bw * 0.5;
-      const bx = W * 0.1, by = ceil + (hy - ceil) * 0.5;
+    function flag(g, bx, by, bw) {
+      const bh = bw * 0.5;
       g.fillStyle = CLUB.shirt; g.fillRect(bx, by, bw, bh);
       for (let i = 0; i < 3; i++) {
         g.fillStyle = CLUB.stripes[i];
         g.fillRect(bx, by + bh * (0.3 + i * 0.16), bw, bh * 0.11);
       }
       g.fillStyle = C.white; g.fillRect(bx, by, bw, Math.max(1, bh * 0.06));
-
-      // vloer: oranje clubhout
-      const fl = g.createLinearGradient(0, hy, 0, H);
-      fl.addColorStop(0, C.floorD);
-      fl.addColorStop(1, C.floor);
-      g.fillStyle = fl;
-      g.fillRect(0, hy, W, H - hy);
-
-      // tafels in de verte, net onder de horizon
-      const fs = clamp(H * 0.012, 2, 10);
-      const ty = hy + fs * 1.4;
-      const spots = [0.04, 0.16, 0.8, 0.92];
-      for (let i = 0; i < spots.length; i++) {
-        const tx = W * spots[i], tw = fs * 7;
-        g.fillStyle = C.legs; g.fillRect(tx + tw * 0.1, ty, fs * 0.4, fs * 1.4); g.fillRect(tx + tw * 0.85, ty, fs * 0.4, fs * 1.4);
-        g.fillStyle = C.table; g.fillRect(tx, ty - fs * 0.5, tw, fs * 0.7);
-        g.fillStyle = '#fff'; g.fillRect(tx, ty - fs * 0.5, tw, Math.max(1, fs * 0.15));
-        g.fillRect(tx + tw / 2 - 0.5, ty - fs * 1.1, 1, fs * 0.7);
-      }
-      // omheining in de verte
-      for (let i = 0; i < 6; i++) {
-        const x = W * (0.25 + i * 0.1);
-        g.fillStyle = i % 2 ? C.red : C.blueM;
-        g.fillRect(x, hy - fs * 0.2, W * 0.09, fs * 1.0);
-      }
-      // trainersbank links, de trainer in clubtenue
-      const bnx = W * 0.02, bny = hy + fs * 4;
-      g.fillStyle = '#5a3418'; g.fillRect(bnx, bny, fs * 10, fs * 0.8);
-      g.fillStyle = C.legs; g.fillRect(bnx + fs, bny + fs * 0.8, fs * 0.5, fs * 1.3); g.fillRect(bnx + fs * 8.5, bny + fs * 0.8, fs * 0.5, fs * 1.3);
-      g.fillStyle = CLUB.shirt; g.fillRect(bnx + fs * 2, bny - fs * 2.2, fs * 1.6, fs * 2.2);
-      g.fillStyle = CLUB.stripes[0]; g.fillRect(bnx + fs * 2, bny - fs * 1.5, fs * 1.6, Math.max(1, fs * 0.25));
-      g.fillStyle = C.skin; g.beginPath(); g.arc(bnx + fs * 2.8, bny - fs * 2.8, fs * 0.7, 0, Math.PI * 2); g.fill();
-      g.fillStyle = C.blueD; g.fillRect(bnx + fs * 5.5, bny - fs * 1.2, fs * 2.4, fs * 1.2); // sporttas
-      g.fillStyle = C.gold; g.fillRect(bnx + fs * 5.5, bny - fs * 0.8, fs * 2.4, Math.max(1, fs * 0.2));
     }
 
+    function clock(g, x, y, r) {
+      g.fillStyle = C.ink;
+      g.beginPath(); g.arc(x, y, r * 1.12, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#f4f4f4';
+      g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = C.ink; g.lineCap = 'round';
+      g.lineWidth = Math.max(1, r * 0.09);
+      g.beginPath();
+      for (let i = 0; i < 12; i++) {
+        const a = i * Math.PI / 6;
+        g.moveTo(x + Math.cos(a) * r * 0.78, y + Math.sin(a) * r * 0.78);
+        g.lineTo(x + Math.cos(a) * r * 0.9, y + Math.sin(a) * r * 0.9);
+      }
+      g.stroke();
+      g.lineWidth = Math.max(1, r * 0.12);
+      g.beginPath();
+      g.moveTo(x, y); g.lineTo(x - r * 0.42, y - r * 0.3);   // tien over tien
+      g.moveTo(x, y); g.lineTo(x + r * 0.5, y - r * 0.5);
+      g.stroke();
+      g.fillStyle = C.red;
+      g.beginPath(); g.arc(x, y, r * 0.08, 0, Math.PI * 2); g.fill();
+      g.lineCap = 'butt';
+    }
+
+    let panoW = 0, panoH = 0;
     function drawBackground() {
-      const key = W + 'x' + H + 'x' + dpr;
+      const key = W + 'x' + H + 'x' + dpr + 'x' + fontKey;
       if (bgKey !== key) {
-        bg = makeCanvas(Math.round(W * dpr), Math.round(H * dpr));
         bgKey = key;
+        panoW = Math.round(W * 2.4);
+        panoH = Math.ceil(hy) + 1;
+        bg = makeCanvas(Math.round(panoW * dpr), Math.round(panoH * dpr));
         if (bg) {
           const g = bg.getContext('2d');
           g.setTransform(dpr, 0, 0, dpr, 0, 0);
-          paintHall(g);
+          paintHall(g, panoW);
         }
       }
-      // panorama: schuift met de draaiing van de hal, getegeld zodat hij nooit opraakt
-      const s = ((bgShift % W) + W) % W;
-      if (bg) {
-        ctx.drawImage(bg, s, 0, W, H);
-        if (s > 0) ctx.drawImage(bg, s - W, 0, W, H);
-      } else {
-        ctx.save(); ctx.translate(s, 0); paintHall(ctx); ctx.restore();
-        if (s > 0) { ctx.save(); ctx.translate(s - W, 0); paintHall(ctx); ctx.restore(); }
+      // vloer: oranje clubhout (horizontaal overal gelijk, dus niet in het panorama)
+      ctx.fillStyle = floorGrad;
+      ctx.fillRect(0, hy, W, H - hy);
+      // panorama: schuift met de draaiing van de hal, rond met periode panoW
+      const P = panoW;
+      let x = ((bgShift % P) + P) % P;
+      while (x > 0) x -= P;
+      for (; x < W; x += P) {
+        if (bg) ctx.drawImage(bg, x, 0, P, panoH);
+        else { ctx.save(); ctx.translate(x, 0); ctx.beginPath(); ctx.rect(0, 0, P, hy); ctx.clip(); paintHall(ctx, P); ctx.restore(); }
       }
     }
 
@@ -406,6 +496,8 @@
       }
       ctx.fill();
 
+      drawReflections();
+
       // omheining langs de baan (rood/blauw), schuift mee
       const seg = 2.5, blen = 2.2, bh = 0.6;
       const b0 = Math.floor((camZ + 1) / seg), b1 = Math.ceil((camZ + 55) / seg);
@@ -445,6 +537,241 @@
       // nevel bij de horizon
       ctx.fillStyle = fogGrad;
       ctx.fillRect(0, hy, W, (H - hy) * 0.22);
+    }
+
+    /* ---------- licht ----------
+       De lampen hangen in twee rijen boven de baan, buiten beeld. Je ziet ze
+       in de glanzende sportvloer: spiegelingen die meeschuiven. (De lampen
+       zelf zouden over de achterwand vallen: die staat op oneindig.) */
+    const LAMP_Y = 7.5, LAMP_X = 2.4, LAMP_SEG = 9, LAMP_LEN = 1.6;
+
+    function lampRange() {
+      return [Math.floor((camZ + 1) / LAMP_SEG), Math.ceil((camZ + VIEW_AHEAD) / LAMP_SEG)];
+    }
+
+    function drawReflections() {
+      const [k0, k1] = lampRange();
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      // een glanzende vloer rekt de spiegeling uit in de diepte: brede, zwakke veeg + smalle kern
+      const layers = [[0.5, 1.6, 0.035], [0.22, 0.7, 0.05]];
+      for (const [hw, ext, a] of layers) {
+        ctx.fillStyle = 'rgba(255,220,180,' + a + ')';
+        ctx.beginPath();
+        for (let k = k0; k <= k1; k++) {
+          const za = k * LAMP_SEG - ext - camZ, zb = k * LAMP_SEG + LAMP_LEN + ext - camZ;
+          if (za < 2) continue;
+          for (let side = -1; side <= 1; side += 2) {
+            const x = side * LAMP_X, ya = sy(-LAMP_Y, za), yb = sy(-LAMP_Y, zb);
+            if (ya < hy) continue;
+            const xa = sx(x, za), xb = sx(x, zb), wa = hw * f / za, wb = hw * f / zb;
+            ctx.moveTo(xa - wa, ya); ctx.lineTo(xa + wa, ya);
+            ctx.lineTo(xb + wb, yb); ctx.lineTo(xb - wb, yb);
+            ctx.closePath();
+          }
+        }
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    // horizontaal vlak op hoogte y tussen x0..x1 en dieptes d0..d1
+    function quadAt(x0, x1, d0, d1, y) {
+      ctx.moveTo(sx(x0, d0), sy(y, d0));
+      ctx.lineTo(sx(x1, d0), sy(y, d0));
+      ctx.lineTo(sx(x1, d1), sy(y, d1));
+      ctx.lineTo(sx(x0, d1), sy(y, d1));
+      ctx.closePath();
+    }
+
+    /* ---------- aankleding langs de baan ----------
+       Om de SIDE_SEG meter, links en rechts buiten de omheining: reservetafels,
+       de trainersbank, een ballenbak, een scheidsrechterstafel, supporters.
+       Vast per plaats (hash): niets flikkert, en alles schuift echt voorbij. */
+    const SIDE_SEG = 7, SIDE_X = 4.7;
+    const SIDE_KINDS = ['table', 'table', 'bench', 'basket', 'umpire', 'fan', 'fan'];
+    const FAN_SHIRTS = [CLUB.shirt, '#c8242a', '#1a5ca8', '#e0b520', '#2fa84f', '#f4f4f4'];
+
+    function addSideProps() {
+      const k0 = Math.floor((camZ + 2) / SIDE_SEG), k1 = Math.ceil((camZ + VIEW_AHEAD) / SIDE_SEG);
+      for (let k = k0; k <= k1; k++) {
+        for (let side = -1; side <= 1; side += 2) {
+          const h = hash(k * 7.13 + side * 31.7);
+          if (h < 0.3) continue;
+          const kind = SIDE_KINDS[Math.floor(hash(k * 3.71 + side * 5.3) * SIDE_KINDS.length)];
+          const z = k * SIDE_SEG + hash(k * 1.37 - side) * 3;
+          const len = kind === 'table' ? 2.74 : kind === 'bench' ? 3 : 0.6;
+          const key = z + len / 2 - camZ;
+          if (z - camZ < 2.5) continue;   // dichterbij valt het toch buiten beeld
+          const x = side * (SIDE_X + (kind === 'table' ? 0.5 : 0) + hash(k * 2.9 + side) * 0.8);
+          list.push({ key, it: null, side: { kind, x, z, len, seed: k * 2 + (side > 0 ? 1 : 0) } });
+        }
+      }
+    }
+
+    function drawSide(p, frame) {
+      const d0 = Math.max(NEAR, p.z - camZ), d1 = p.z + p.len - camZ;
+      if (p.kind === 'table') { drawSideTable(p.x, d0, d1); return; }
+      if (p.kind === 'bench') { drawBench(p, d0, d1, frame); return; }
+      const d = (d0 + d1) / 2, s = f / d;
+      ctx.save();
+      ctx.translate(sx(p.x, d), sy(0, d));
+      ctx.scale(s, s);
+      shadow(0.45);
+      if (p.kind === 'basket') {
+        ctx.fillStyle = C.legs;
+        ctx.fillRect(-0.3, -0.55, 0.04, 0.55); ctx.fillRect(0.26, -0.55, 0.04, 0.55);
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        for (let i = 0; i < 9; i++) {
+          const bx = -0.24 + (i % 5) * 0.12 + (i > 4 ? 0.06 : 0), by = i > 4 ? -0.98 : -0.9;
+          ctx.moveTo(bx + 0.06, by); ctx.arc(bx, by, 0.06, 0, Math.PI * 2);
+        }
+        ctx.fill();
+        ctx.fillStyle = C.blueM;
+        ctx.fillRect(-0.34, -0.88, 0.68, 0.36);
+        ctx.fillStyle = C.gold;
+        ctx.fillRect(-0.34, -0.88, 0.68, 0.05);
+      } else if (p.kind === 'umpire') {
+        ctx.fillStyle = C.legs;
+        ctx.fillRect(-0.35, -0.72, 0.04, 0.72); ctx.fillRect(0.31, -0.72, 0.04, 0.72);
+        ctx.fillStyle = '#0d2c57';
+        ctx.fillRect(-0.4, -0.76, 0.8, 0.08);
+        // telbord
+        ctx.fillStyle = '#111';
+        ctx.fillRect(-0.3, -1.12, 0.6, 0.36);
+        ctx.fillStyle = '#f4f4f4';
+        ctx.fillRect(-0.27, -1.08, 0.25, 0.28);
+        ctx.fillRect(0.02, -1.08, 0.25, 0.28);
+        ctx.fillStyle = '#111';
+        ctx.scale(0.01, 0.01);           // tekst in honderdsten: geen piepkleine lettergrootte
+        ctx.font = 'bold 20px system-ui, sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(String(3 + (p.seed % 8)), -14.5, -93);
+        ctx.fillText(String(1 + (p.seed % 9)), 14.5, -93);
+      } else {
+        drawFan(p, frame);
+      }
+      ctx.restore();
+    }
+
+    function shadow(r) {
+      ctx.fillStyle = 'rgba(0,0,0,0.22)';
+      ctx.beginPath(); ctx.ellipse(0, 0, r, r * 0.25, 0, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // supporter: springt en klapt af en toe
+    function drawFan(p, frame) {
+      const shirt = FAN_SHIRTS[p.seed % FAN_SHIRTS.length];
+      const hair = ['#3a2618', '#111', '#a0622d', '#e2c27a'][p.seed % 4];
+      const ph = frame * 0.18 + p.seed * 1.7;
+      const cheer = Math.sin(ph * 0.25) > 0.3;
+      const hop = cheer ? Math.max(0, Math.sin(ph)) * 0.08 : 0;
+      ctx.translate(0, -hop);
+      limb(-0.1, -0.85, -0.1, -0.05, 0.12, C.skin);
+      limb(0.1, -0.85, 0.1, -0.05, 0.12, C.skin);
+      ctx.fillStyle = '#1c2430';
+      ctx.fillRect(-0.2, -0.98, 0.4, 0.26);
+      const up = cheer ? -0.62 + Math.sin(ph) * 0.12 : 0;
+      limb(-0.22, -1.38, -0.32, cheer ? -1.85 - up * 0.2 : -0.98, 0.09, C.skin);
+      limb(0.22, -1.38, 0.32, cheer ? -1.85 + up * 0.2 : -0.98, 0.09, C.skin);
+      ctx.fillStyle = shirt;
+      roundRect(-0.25, -1.45, 0.5, 0.52, 0.08); ctx.fill();
+      ctx.fillStyle = C.skin;
+      ctx.beginPath(); ctx.arc(0, -1.6, 0.14, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = hair;
+      ctx.beginPath(); ctx.arc(0, -1.64, 0.14, Math.PI, Math.PI * 2); ctx.fill();
+    }
+
+    function drawSideTable(xm, d0, d1) {
+      const x0 = xm - 0.76, x1 = xm + 0.76, top = 0.76;
+      ctx.save();
+      ctx.fillStyle = 'rgba(0,0,0,0.16)';
+      ctx.beginPath(); quadFloor(x0 + 0.05, x1 - 0.05, d0 + 0.1, d1 - 0.1); ctx.fill();
+      ctx.strokeStyle = C.legs;
+      ctx.lineWidth = Math.max(1, 0.05 * f / d0);
+      ctx.beginPath();
+      for (const d of [d0 + 0.3, d1 - 0.3]) {
+        for (const x of [x0 + 0.15, x1 - 0.15]) { ctx.moveTo(sx(x, d), sy(0, d)); ctx.lineTo(sx(x, d), sy(top, d)); }
+      }
+      ctx.stroke();
+      // zijkant naar de camera
+      const xs = xm > camX ? x0 : x1;
+      ctx.fillStyle = C.tableD;
+      ctx.beginPath();
+      ctx.moveTo(sx(xs, d0), sy(top, d0)); ctx.lineTo(sx(xs, d1), sy(top, d1));
+      ctx.lineTo(sx(xs, d1), sy(top - 0.05, d1)); ctx.lineTo(sx(xs, d0), sy(top - 0.05, d0));
+      ctx.closePath(); ctx.fill();
+      ctx.fillRect(sx(x0, d0), sy(top, d0), sx(x1, d0) - sx(x0, d0), 0.05 * f / d0 + 1);
+      ctx.fillStyle = C.table;
+      ctx.beginPath(); quadAt(x0, x1, d0, d1, top); ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = Math.max(0.6, 0.02 * f / d0);
+      ctx.beginPath(); quadAt(x0 + 0.02, x1 - 0.02, d0 + 0.02, d1 - 0.02, top); ctx.stroke();
+      // net dwars over het midden
+      const dm = (d0 + d1) / 2;
+      ctx.fillStyle = 'rgba(240,240,240,0.75)';
+      ctx.beginPath();
+      ctx.moveTo(sx(x0 - 0.1, dm), sy(top, dm)); ctx.lineTo(sx(x1 + 0.1, dm), sy(top, dm));
+      ctx.lineTo(sx(x1 + 0.1, dm), sy(top + 0.15, dm)); ctx.lineTo(sx(x0 - 0.1, dm), sy(top + 0.15, dm));
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+
+    function drawBench(p, d0, d1, frame) {
+      const x0 = p.x - 0.22, x1 = p.x + 0.22, seat = 0.45;
+      ctx.save();
+      ctx.fillStyle = 'rgba(0,0,0,0.16)';
+      ctx.beginPath(); quadFloor(x0, x1, d0, d1); ctx.fill();
+      const xs = p.x > camX ? x0 : x1;
+      ctx.fillStyle = '#3e230f';
+      ctx.beginPath();
+      ctx.moveTo(sx(xs, d0), sy(seat, d0)); ctx.lineTo(sx(xs, d1), sy(seat, d1));
+      ctx.lineTo(sx(xs, d1), sy(0, d1)); ctx.lineTo(sx(xs, d0), sy(0, d0));
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#6b3f1d';
+      ctx.beginPath(); quadAt(x0, x1, d0, d1, seat); ctx.fill();
+      // de trainer en zijn sporttas
+      const d = d0 + 0.8, s = f / d;
+      ctx.translate(sx(p.x, d), sy(seat, d));
+      ctx.scale(s, s);
+      const nod = Math.sin(frame * 0.05 + p.seed) * 0.02;
+      ctx.fillStyle = '#111';
+      ctx.fillRect(-0.2, -0.12, 0.4, 0.14);
+      ctx.fillStyle = C.blueD;
+      roundRect(-0.25, -0.75, 0.5, 0.66, 0.08); ctx.fill();
+      ctx.fillStyle = C.chrome;
+      ctx.fillRect(-0.25, -0.75, 0.5, 0.04);
+      ctx.fillStyle = C.skin;
+      ctx.beginPath(); ctx.arc(nod, -0.9, 0.14, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#8a8f96';
+      ctx.beginPath(); ctx.arc(nod, -0.94, 0.14, Math.PI, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = C.blueM;
+      roundRect(0.35, -0.3, 0.5, 0.3, 0.06); ctx.fill();
+      ctx.fillStyle = C.gold;
+      ctx.fillRect(0.35, -0.22, 0.5, 0.04);
+      ctx.restore();
+    }
+
+    // ledemaat: afgeronde lijn met een donkere rand
+    function limb(x0, y0, x1, y1, w, col) {
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = OUTLINE;
+      ctx.lineWidth = w + 0.04;
+      ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+      ctx.strokeStyle = col;
+      ctx.lineWidth = w;
+      ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+    }
+
+    function roundRect(x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
     }
 
     /* ---------- figuren (in meter, y omhoog = negatief) ---------- */
@@ -1095,13 +1422,21 @@
         }
         list.push({ key, it });
       }
+      addSideProps();
       list.push({ key: CAM_BACK, it: null });
       list.sort((a, b) => b.key - a.key);
 
       for (let i = 0; i < list.length; i++) {
         const e = list[i];
         const it = e.it;
-        if (!it) { drawPlayer(state); continue; }
+        if (e.side) {
+          const fd = clamp((VIEW_AHEAD + CAM_BACK - e.key) / (VIEW_AHEAD + CAM_BACK - FADE_FROM), 0, 1);
+          if (fd <= 0) continue;
+          ctx.globalAlpha = fd;
+          drawSide(e.side, frame);
+          continue;
+        }
+        if (!it) { ctx.globalAlpha = 1; drawPlayer(state); continue; }
         const d0 = Math.max(NEAR, it.z - camZ), d1 = Math.max(d0 + 0.01, it.z + (it.len || 0) - camZ);
         const fade = clamp((VIEW_AHEAD + CAM_BACK - d0) / (VIEW_AHEAD + CAM_BACK - FADE_FROM), 0, 1);
         if (fade <= 0) continue;
@@ -1117,6 +1452,9 @@
         }
       }
       ctx.globalAlpha = 1;
+
+      ctx.fillStyle = vignette;
+      ctx.fillRect(0, 0, W, H);
 
       if (state.alive === false) {
         ctx.fillStyle = 'rgba(200,36,42,0.28)';
