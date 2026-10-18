@@ -106,6 +106,63 @@ leeg (of zet `provider: 'local'`), dan blijft alles lokaal.
 De database weigert ook zelf onmogelijke runs: namen langer dan 16 tekens, een score hoger dan
 afstand plus ballen kan opleveren, of een afstand die in die tijd niet te lopen is.
 
+### Edge Function
+
+De functie `submit-run` (`supabase/functions/submit-run/`) krijgt van het spel de invoerlijst van een
+dagrun, speelt die opnieuw af met dezelfde spelcode, claimt of controleert de naam met het
+toestelgeheim, past de tempolimiet toe en bewaart de run. Eenmalig installeren:
+
+1. Installeer de Supabase CLI: <https://supabase.com/docs/guides/cli>.
+2. Meld je aan en koppel het project (vanuit de map van deze repo):
+
+   ```sh
+   supabase login
+   supabase link --project-ref aqaikstibteqcdgxtuiw
+   ```
+
+3. Zet de functie online en vertel ze vanaf welke site het spel draait:
+
+   ```sh
+   supabase functions deploy submit-run
+   supabase secrets set ALLOWED_ORIGIN=https://boermansjo.github.io
+   ```
+
+   `ALLOWED_ORIGIN` mag een komma-gescheiden lijst zijn. `http://localhost:<poort>` en
+   `http://127.0.0.1:<poort>` mogen altijd, om lokaal te testen. `supabase/config.toml` (gemaakt met
+   `supabase init`) zet voor deze functie `verify_jwt = true`: zonder de publieke anon-sleutel als
+   `Authorization: Bearer` weigert Supabase het verzoek al voor de functie draait.
+
+4. Controleer met drie `curl`-verzoeken. Speel eerst een **dagrun** in de browser en kopieer daarna in
+   de console van de ontwikkelaarstools de run naar het klembord:
+
+   ```js
+   copy(JSON.stringify(TTR.debug.lastRun))
+   ```
+
+   (`TTR.debug.lastRun` bestaat zodra het spel de runs naar de functie stuurt.) Plak dat in een bestand
+   `run.json`. Vervang `<anon key>` hieronder door de publieke sleutel; in PowerShell typ je `curl.exe`
+   in plaats van `curl`.
+
+   - **Echte run** → `{"ok":true,"score":…,"personalBest":…,"todayBest":…,"newBest":…}`:
+
+     ```sh
+     curl -H "Authorization: Bearer <anon key>" -H "Content-Type: application/json" --data @run.json https://aqaikstibteqcdgxtuiw.supabase.co/functions/v1/submit-run
+     ```
+
+   - **Vervalste run**: kopieer `run.json` naar `run-vals.json` en tel 30 op bij `frames`. Dezelfde
+     opdracht met `--data @run-vals.json` geeft `400` en `{"ok":false,"code":"replay",…}`.
+   - **Naam van een ander toestel**: kopieer `run.json` naar `run-naam.json` en vervang `secret` door
+     64 andere hex-tekens (bv. 64 nullen). Met `--data @run-naam.json` krijg je `409` en
+     `{"ok":false,"code":"name",…}`.
+
+   De run van de eerste controle staat daarna echt in de ranglijst (het is een gewone run).
+   Stuur je dezelfde run binnen een paar seconden opnieuw, dan krijg je `429` (`"code":"rate"`).
+   Een run van eergisteren of ouder geeft `400` (`"code":"date"`): enkel vandaag en gisteren tellen.
+
+   Krijg je `401` met "Invalid JWT"? De nieuwe sleutels die beginnen met `sb_publishable_` zijn geen
+   JWT. Gebruik dan de oude anon-sleutel (begint met `eyJ`, onder **Project Settings → API Keys →
+   Legacy API Keys**).
+
 ### Moderatie
 
 Valt er een score of speler op die er niet hoort te staan? Open in Supabase de **Table Editor**,
@@ -139,6 +196,9 @@ Het lege bestand `.nojekyll` zorgt dat GitHub de bestanden ongewijzigd serveert.
 | `app.js` | schermen, knoppen, geluid en de animatielus |
 | `supabase/runner_v2.sql` | de tabellen, views en rechten van de eerlijke ranglijst |
 | `supabase/runner_scores.sql` | de oude tabel en de rechten |
+| `supabase/functions/submit-run/` | de Edge Function: `index.ts` (HTTP, naam, database) en `core.js` (de controles) |
+| `supabase/functions/_shared/` | kopie van de spelcode voor de herberekening op de server |
+| `supabase/config.toml` | instellingen voor de Supabase CLI |
 | `test/` | de tests (`node --test`) |
 | `docs/superpowers/specs/` | het ontwerp |
 
