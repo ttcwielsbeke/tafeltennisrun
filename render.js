@@ -62,7 +62,7 @@
                 backName: 'NOPPEN', socks: '#2fa84f', wristband: '#2fa84f' }),
     kampioen: { shirt: '#e0b520', trim: '#fff6c8', hem: '#a88410', shorts: '#111111',
                 stripes: ['#e4474c', '#161616', '#2eb1c2'], bat: C.red, backName: 'KAMPIOEN',
-                shoes: C.gold, headband: '#161616' }
+                shoes: C.gold, headband: '#fff6c8' }
   };
   const OUTLINE = '#0a1424';   // donkere rand rond figuren
   const HUD_FONT = '"Press Start 2P", monospace';
@@ -1485,7 +1485,11 @@
         if (kit.headband) {
           ctx.fillStyle = kit.headband;
           ctx.beginPath(); ctx.ellipse(hx, hy0 - 0.03, 0.155, 0.04, 0, 0, Math.PI * 2); ctx.fill();
-          ctx.fillRect(hx - 0.02, hy0 - 0.02, 0.05, 0.14);   // knoop met lintjes
+          // knoop met twee lintjes die naar achteren wapperen
+          ctx.beginPath();
+          ctx.moveTo(hx - 0.01, hy0 - 0.03); ctx.lineTo(hx - 0.09, hy0 + 0.1); ctx.lineTo(hx - 0.04, hy0 + 0.11); ctx.closePath();
+          ctx.moveTo(hx + 0.01, hy0 - 0.03); ctx.lineTo(hx + 0.07, hy0 + 0.12); ctx.lineTo(hx + 0.11, hy0 + 0.09); ctx.closePath();
+          ctx.fill();
         }
       }
       // stofwolkjes bij een slide, puur uit het frame
