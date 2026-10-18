@@ -8,8 +8,9 @@
 (function (root) {
   'use strict';
 
-  /* toonladder voor ballen na elkaar: pentatonisch, klinkt altijd goed */
-  const COMBO = [1, 9 / 8, 5 / 4, 3 / 2, 5 / 3, 2, 9 / 4, 5 / 2, 3, 10 / 3];
+  /* toonladder voor ballen na elkaar: pentatonisch, klinkt altijd goed. Hoogstens één
+     octaaf boven de start; een langere reeks blijft op de hoogste toon. */
+  const COMBO = [1, 9 / 8, 5 / 4, 3 / 2, 5 / 3, 2];
   const COMBO_GAP = 0.9;       // seconden: binnen deze tijd telt de volgende bal als reeks
 
   function createAudio(opts) {
