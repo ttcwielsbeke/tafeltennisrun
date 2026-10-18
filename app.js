@@ -21,6 +21,7 @@
   let game = TTR.createGame(TTR.dailySeed());
   let queue = [];
   let overAt = 0;
+  let milestone = 0;          // hoeveel keer 500 m we al gelopen hebben
 
   const CRASH = {
     nopper: 'Door de noppen gegaan!',
@@ -61,44 +62,19 @@
     return fresh;
   }
 
-  /* ---------- geluid: standaard uit ---------- */
-  let soundOn = false;
-  let ac = null;
-  function beep(freq, dur, type, vol, slideTo) {
-    if (!soundOn || !ac) return;
-    const t = ac.currentTime;
-    const o = ac.createOscillator(), g = ac.createGain();
-    o.type = type || 'square';
-    o.frequency.setValueAtTime(freq, t);
-    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
-    g.gain.setValueAtTime(vol || 0.06, t);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g).connect(ac.destination);
-    o.start(t); o.stop(t + dur + 0.02);
-  }
-  const SOUNDS = {
-    jump:   () => beep(420, 0.15, 'square', 0.05, 760),
-    slide:  () => beep(300, 0.15, 'triangle', 0.07, 140),
-    lane:   () => beep(520, 0.05, 'triangle', 0.04),
-    ball:   () => { beep(1320, 0.06, 'sine', 0.06); beep(1760, 0.08, 'sine', 0.04); },
-    shield: () => { beep(523, 0.08, 'square', 0.05); beep(784, 0.12, 'square', 0.05); },
-    magnet: () => { beep(660, 0.08, 'square', 0.05); beep(990, 0.12, 'square', 0.05); },
-    timeout: () => beep(880, 0.35, 'sine', 0.06, 440),
-    bak:    () => { beep(784, 0.07, 'square', 0.05); beep(1046, 0.07, 'square', 0.05); beep(1568, 0.1, 'square', 0.04); },
-    block:  () => beep(200, 0.2, 'sawtooth', 0.07, 90),
-    crash:  () => beep(160, 0.45, 'sawtooth', 0.09, 50)
-  };
+  /* ---------- geluid: standaard uit, je keuze wordt onthouden (audio.js) ---------- */
+  const audio = TTR.createAudio();
   function setSound(on) {
-    soundOn = on;
-    if (on && !ac) {
-      try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { soundOn = false; }
-    }
-    if (ac && ac.state === 'suspended' && on) ac.resume();
+    const now = audio.setOn(on);
+    save('ttr.sound', now ? 1 : 0);
+    if (now && mode === 'run') audio.startAmbience();
     const b = $('btn-sound');
-    b.innerHTML = soundOn ? '&#128266;' : '&#128263;';
-    b.setAttribute('aria-pressed', String(soundOn));
-    b.setAttribute('aria-label', soundOn ? 'Geluid uitzetten' : 'Geluid aanzetten');
+    b.innerHTML = now ? '&#128266;' : '&#128263;';
+    b.setAttribute('aria-pressed', String(now));
+    b.setAttribute('aria-label', now ? 'Geluid uitzetten' : 'Geluid aanzetten');
   }
+  // browsers starten geluid pas na een klik of toets: bij de eerste de context wekken
+  for (const ev of ['pointerdown', 'keydown', 'touchstart']) document.addEventListener(ev, () => audio.wake(), true);
 
   /* ---------- schermen ---------- */
   function show(name) {
@@ -112,13 +88,16 @@
     queue = [];
     loop.reset();
     mode = 'run';
+    milestone = 0;
     show(null);
+    audio.startAmbience();
     canvas.focus && canvas.focus();
   }
 
   function pause() {
     if (mode !== 'run') return;
     mode = 'pause';
+    audio.stopAmbience();
     show('pause');
     $('btn-resume').focus();
   }
@@ -128,10 +107,12 @@
     queue = [];
     loop.reset();
     show(null);
+    audio.startAmbience();
   }
 
   function gameOver() {
     mode = 'over';
+    audio.stopAmbience();
     overAt = performance.now();
     const score = TTR.scoreOf(game);
     $('over-title').textContent = CRASH[game.crashedBy] || 'Gebotst!';
@@ -281,7 +262,7 @@
   $('btn-home').addEventListener('click', home);
   $('skin-prev').addEventListener('click', (e) => { nextSkin(-1); e.currentTarget.blur(); });
   $('skin-next').addEventListener('click', (e) => { nextSkin(1); e.currentTarget.blur(); });
-  $('btn-sound').addEventListener('click', (e) => { setSound(!soundOn); e.currentTarget.blur(); });
+  $('btn-sound').addEventListener('click', (e) => { setSound(!audio.on); e.currentTarget.blur(); });
   $('name-form').addEventListener('submit', (e) => {
     e.preventDefault();
     const name = board.setName($('name-input').value);
@@ -295,8 +276,17 @@
     update() {
       if (mode !== 'run') return;
       const acts = queue; queue = [];
+      const lane0 = game.lane, air0 = game.y > 0;
       TTR.step(game, acts);
-      for (const ev of game.events) if (SOUNDS[ev]) SOUNDS[ev]();
+      for (const ev of game.events) {
+        if (ev === 'lane') audio.play('lane', { dir: Math.sign(game.lane - lane0) });
+        else if (ev === 'ball') audio.play('ball', { double: game.bak > 0 });
+        else audio.play(ev);
+      }
+      if (air0 && game.y <= 0 && game.alive) audio.play('land');
+      // om de 500 m juicht het publiek
+      const m = Math.floor(game.dist / 500);
+      if (m > milestone) { milestone = m; audio.play('cheer'); }
       if (!game.alive) gameOver();
     },
     render() { renderer.draw(game); }
@@ -309,7 +299,7 @@
   }
 
   $('seed-today').textContent = TTR.dailySeed();
-  setSound(false);
+  setSound(load('ttr.sound') === '1');
   renderer.setSkin(skin);
   showSkin();
   show('start');
@@ -317,5 +307,5 @@
   requestAnimationFrame(tick);
 
   // voor de browsertest en wie wil spieken: de huidige toestand
-  window.TTR.debug = { board, get game() { return game; }, get mode() { return mode; } };
+  window.TTR.debug = { board, audio, get game() { return game; }, get mode() { return mode; } };
 })();

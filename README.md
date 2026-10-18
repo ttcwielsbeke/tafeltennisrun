@@ -29,7 +29,9 @@ Open `index.html` of speel online (GitHub Pages, zie onder).
   met de pijltjes (of ←/→). Puur voor het oog: geen voordeel in het spel. De drempels staan in `config.js`.
 - De snelheid loopt langzaam op. Na een botsing: één tik op **Opnieuw**.
 - **Oefenen** gebruikt een willekeurige baan en telt niet mee voor de ranglijst.
-- Geluid staat standaard uit (knop rechtsboven).
+- Geluid staat standaard uit (knop rechtsboven); je keuze wordt onthouden. Alles is gesynthetiseerd: sneakerpiep
+  bij een slide, een echte "pok" per bal (na elkaar gepakt klimt de toon), het fluitje van de scheidsrechter bij
+  een time-out, publiek dat juicht om de 500 m, en zacht geroezemoes met rally's aan tafels verderop.
 
 Bij je eerste score vraagt het spel je naam (max. 16 tekens); die wordt onthouden op je toestel.
 Daarna gaat elke score van de dagbaan vanzelf naar de ranglijst: de top 25 van vandaag, plus
@@ -59,6 +61,7 @@ node --test
 - `test/game.test.js`: een vaste seed met een vast invoerscript en een autopiloot (`test/bot.js`) geven altijd dezelfde score; schild, magneet, time-out, ballenbak, besturing en de vaste-stap-lus.
 - `test/skins.test.js`: welke tenues bij welke beste score horen, en dat elk tenue een tekening heeft.
 - `test/board.test.js`: de ranglijst aller tijden houdt per speler de beste score, ook via Supabase, met terugval op lokaal.
+- `test/audio.test.js`: zonder Web Audio loopt het spel gewoon (geluid doet dan niets), en elke gebeurtenis heeft een geluid.
 
 Pas je `config.js` of `world.js` aan, dan veranderen de "gouden" scores in `test/game.test.js`. Dat is de bedoeling: bereken ze opnieuw en pas ze bewust aan.
 
@@ -138,6 +141,7 @@ Het lege bestand `.nojekyll` zorgt dat GitHub de bestanden ongewijzigd serveert.
 | `game.js` | de simulatie met vaste stap van 1/60 s |
 | `skins.js` | welke tenues je met je beste score vrijspeelt |
 | `input.js` | vegen, tikken en toetsen → `left` `right` `jump` `slide` `pause` |
+| `audio.js` | alle geluiden, gesynthetiseerd met Web Audio, en de sfeer in de hal |
 | `render.js` | tekent de hal, de speler, de obstakels en de HUD |
 | `board.js` | ranglijst: Supabase, met `localStorage` als vangnet |
 | `app.js` | schermen, knoppen, geluid en de animatielus |
@@ -150,7 +154,7 @@ Het lege bestand `.nojekyll` zorgt dat GitHub de bestanden ongewijzigd serveert.
 Geen build, geen framework, geen npm. Elk script hangt zijn deel aan één globale namespace
 `TTR` (in de browser `window.TTR`, in Node `globalThis.TTR`) en exporteert het ook via
 `module.exports`, zodat de tests het met `require()` kunnen laden. Volgorde in `index.html`:
-`config.js`, `rng.js`, `world.js`, `game.js`, `skins.js`, `input.js`, `render.js`, `board.js`, `app.js`.
+`config.js`, `rng.js`, `world.js`, `game.js`, `skins.js`, `input.js`, `audio.js`, `render.js`, `board.js`, `app.js`.
 
 ### Contract tussen de modules
 
@@ -235,4 +239,10 @@ TTR_CONFIG = {
 - Valt stil terug op `localStorage` als url/key leeg zijn of Supabase niet antwoordt.
 
 **`app.js`** — de enige lijm met de DOM: schermen, knoppen (pauze, geluid), naamvraag,
-ranglijstpaneel, WebAudio-piepjes (standaard uit) en de `requestAnimationFrame`-lus.
+ranglijstpaneel, geluid aan/uit (via `audio.js`) en de `requestAnimationFrame`-lus.
+
+**`audio.js`**
+- `TTR.createAudio({ context? }) → { on, setOn(bool), wake(), play(name, opts?, when?), startAmbience(), stopAmbience(), names }`
+  — `name` is een spelgebeurtenis (`jump`, `slide`, `lane` met `{dir}`, `ball` met `{double}`, `shield`, `magnet`,
+  `timeout`, `bak`, `block`, `crash`) of `land` / `cheer`. Zonder Web Audio doet alles niets. Een `OfflineAudioContext`
+  meegeven kan, om geluiden te renderen en te meten.
