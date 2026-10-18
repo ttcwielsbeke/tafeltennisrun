@@ -25,6 +25,8 @@
     },
 
     game: {
+      version: 1,            // spelversie: verhogen bij elke wijziging aan spellogica of baan
+
       /* snelheid in meter per seconde */
       startSpeed: 10,
       accel: 0.07,           // m/s erbij per seconde lopen, tot cruiseSpeed (~3 min)
