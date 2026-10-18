@@ -76,6 +76,8 @@ test('geweigerd', () => {
   weiger(F, [[10, 'fly']], 'action');
   weiger(F, [[F, 'jump']], 'range');
   weiger(F, Array.from({ length: 20001 }, () => [0, 'jump']), 'inputs');
+  weiger(F, [[5, 'jump', {}]], 'inputs');                              // geen extra velden
+  weiger(F, [[5]], 'inputs');
   weiger(0, [], 'frames');
   weiger(108001, [], 'frames');
   weiger(F + 30, goed, 'nocrash');                                    // crash kwam eerder dan `frames`

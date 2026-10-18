@@ -27,7 +27,7 @@ type ReplayResult = {
 
 type CheckedRun = {
   seed: string; name: string; secretHex: string; version: number;
-  frames: number; inputs: unknown[]; claimed: unknown; kit: string;
+  frames: number; inputs: [number, string][]; claimed: unknown; kit: string;
   result: ReplayResult;
 };
 
@@ -227,7 +227,7 @@ async function handle(req: Request, cors: Record<string, string>): Promise<Respo
       score,
       game_version: run.version,
       frames: run.frames,
-      inputs: run.inputs,
+      inputs: run.inputs.map((e) => [e[0], e[1]]),  // genormaliseerde kopie: nooit extra velden bewaren
       updated_at: new Date().toISOString()
     }, { onConflict: 'player_id,seed' });
     if (up.error) throw up.error;

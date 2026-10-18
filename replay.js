@@ -28,7 +28,8 @@
     if (!Array.isArray(inputs) || inputs.length > LIMITS.maxInputs) return 'inputs';
     let prev = 0;
     for (const entry of inputs) {
-      if (!Array.isArray(entry) || !ACTIONS.includes(entry[1])) return 'action';
+      if (!Array.isArray(entry) || entry.length !== 2) return 'inputs';   // precies [frame, actie], niets extra
+      if (!ACTIONS.includes(entry[1])) return 'action';
       const f = entry[0];
       if (!Number.isInteger(f) || f < 0 || f >= frames) return 'range';
       if (f < prev) return 'order';
