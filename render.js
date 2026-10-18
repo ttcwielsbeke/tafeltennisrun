@@ -1083,6 +1083,69 @@
       ctx.restore();
     }
 
+    /* sterretje + punten bij het pakken: puur uit hoe ver je al voorbij het item bent */
+    const BURST_M = 1.8;
+    const BURST_COL = { ball: C.gold, shield: C.chrome, magnet: C.gold, timeout: C.chrome, bak: C.gold };
+    function drawBurst(it, state) {
+      const t = clamp((state.dist - it.z) / BURST_M, 0, 1);
+      const d = CAM_BACK, s = f / d;
+      const x = ((state.x == null ? 1 : state.x) - 1) * LANE_W;
+      const y = it.type === 'ball' ? (typeof it.y === 'number' ? it.y : (it.air ? 1.4 : 0.35)) : 0.6;
+      const px = sx(x, d), py = sy(Math.max(y, (state.y || 0) + 0.9), d);
+      const col = BURST_COL[it.type] || C.gold;
+      ctx.save();
+      ctx.globalAlpha = 1 - t;
+      ctx.strokeStyle = col;
+      ctx.lineWidth = Math.max(1.5, 0.05 * s * (1 - t));
+      ctx.beginPath(); ctx.arc(px, py, (0.15 + t * 0.55) * s, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath();
+      for (let i = 0; i < 8; i++) {
+        const a = i * Math.PI / 4 + 0.3, r0 = (0.25 + t * 0.5) * s, r1 = r0 + 0.18 * s * (1 - t);
+        ctx.moveTo(px + Math.cos(a) * r0, py + Math.sin(a) * r0);
+        ctx.lineTo(px + Math.cos(a) * r1, py + Math.sin(a) * r1);
+      }
+      ctx.stroke();
+      if (it.type === 'ball') {
+        const cfg = (root.TTR_CONFIG && root.TTR_CONFIG.game) || {};
+        const pts = (cfg.ballPoints || 10) * (state.bak > 0 ? 2 : 1);
+        const fs = Math.round(clamp(0.22 * s, 10, 22));
+        ctx.font = fs + 'px ' + HUD_FONT;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.lineJoin = 'round';
+        ctx.lineWidth = Math.max(3, fs * 0.35);
+        ctx.strokeStyle = C.ink;
+        const ty = py - (0.5 + t * 0.6) * s;
+        ctx.strokeText('+' + pts, px + 0.5 * s, ty);
+        ctx.fillStyle = pts > (cfg.ballPoints || 10) ? C.gold : '#fff';
+        ctx.fillText('+' + pts, px + 0.5 * s, ty);
+      }
+      ctx.restore();
+    }
+
+    /* snelheidsstrepen aan de randen, vanaf ~13 m/s: hoe sneller, hoe meer */
+    function drawSpeed(state) {
+      const v = state.vel || 0;
+      const k = clamp((v - 13) / 9, 0, 1);
+      if (k <= 0 || state.alive === false) return;
+      const R = Math.hypot(W, H - hy);
+      const t0 = (state.dist || 0) * 0.045;
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255,255,255,' + (0.24 * k).toFixed(3) + ')';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for (let i = 0; i < 18; i++) {
+        const side = i % 2 ? 1 : -1;
+        const a = side * (0.55 + hash(i * 3.3) * 0.9) + (side < 0 ? Math.PI : 0);   // schuin naar de zijkanten
+        const ph = (t0 + hash(i * 7.7)) % 1;
+        const r0 = R * (0.35 + ph * 0.75), r1 = r0 + R * (0.06 + 0.1 * k);
+        const ca = Math.cos(a), sa = Math.abs(Math.sin(a));
+        ctx.moveTo(cx + ca * r0, hy + sa * r0);
+        ctx.lineTo(cx + ca * r1, hy + sa * r1);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+
     function drawPickup(item, d, state) {
       const s = f / d;
       const x = typeof item.x === 'number' ? (item.x - 1) * LANE_W : (item.lane - 1) * LANE_W;
@@ -1577,7 +1640,12 @@
       const items = state.items || [];
       for (let i = 0; i < items.length; i++) {
         const it = items[i];
-        if (it.taken) continue;
+        if (it.taken) {
+          // net gepakt: nog even een sterretje en de punten bij de speler
+          const ago = dist - it.z;
+          if (ago >= 0 && ago < BURST_M) list.push({ key: CAM_BACK - 0.05, it: null, burst: it });
+          continue;
+        }
         const len = it.len || 0;
         if (it.z + len < dist - VIEW_BEHIND || it.z > dist + VIEW_AHEAD) continue;
         if (it.z + len - camZ < NEAR) continue;
@@ -1596,6 +1664,7 @@
       for (let i = 0; i < list.length; i++) {
         const e = list[i];
         const it = e.it;
+        if (e.burst) { ctx.globalAlpha = 1; drawBurst(e.burst, state); continue; }
         if (e.side) {
           const fd = clamp((VIEW_AHEAD + CAM_BACK - e.key) / (VIEW_AHEAD + CAM_BACK - FADE_FROM), 0, 1);
           if (fd <= 0) continue;
@@ -1620,6 +1689,7 @@
       }
       ctx.globalAlpha = 1;
 
+      drawSpeed(state);
       ctx.fillStyle = vignette;
       ctx.fillRect(0, 0, W, H);
 
