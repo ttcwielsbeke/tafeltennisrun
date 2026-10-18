@@ -1,6 +1,10 @@
 -- ============================================================
--- Tafeltennisrun — ranglijst voor heel de club
--- Plak dit hele bestand in Supabase -> SQL Editor -> Run.
+-- Verouderd — gebruik supabase/runner_v2.sql
+--
+-- Tafeltennisrun — de oude ranglijst (één tabel, scores rechtstreeks
+-- vanuit de browser). Enkel nog hier zodat de oude scores leesbaar
+-- blijven. Toevoegen door het publiek kan niet meer: scores komen nu
+-- via de Edge Function `submit-run` in de tabellen van runner_v2.sql.
 -- Je mag het gerust opnieuw draaien, er gaat niets stuk.
 -- ============================================================
 
@@ -17,15 +21,15 @@ create index if not exists runner_scores_seed_score_idx
 create index if not exists runner_scores_score_idx
   on public.runner_scores (score desc);
 
--- Iedereen mag lezen en toevoegen; wijzigen of wissen mag niet.
+-- Iedereen mag lezen; toevoegen, wijzigen of wissen mag niet.
 alter table public.runner_scores enable row level security;
 
 drop policy if exists "runner_scores lezen" on public.runner_scores;
 create policy "runner_scores lezen" on public.runner_scores
   for select to anon, authenticated using (true);
 
+-- de vroegere toevoeg-regel, mocht ze nog bestaan
 drop policy if exists "runner_scores toevoegen" on public.runner_scores;
-create policy "runner_scores toevoegen" on public.runner_scores
-  for insert to anon, authenticated with check (true);
 
-grant select, insert on public.runner_scores to anon, authenticated;
+revoke insert, update, delete on public.runner_scores from anon, authenticated;
+grant select on public.runner_scores to anon, authenticated;

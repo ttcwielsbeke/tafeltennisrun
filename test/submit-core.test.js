@@ -144,6 +144,8 @@ test('meldingen hebben de vaste tekst', () => {
     name: 'Deze naam is al in gebruik op een ander toestel.',
     rate: 'Even geduld…',
     error: 'Er ging iets mis bij het bewaren.',
-    format: 'Deze run klopt niet.'
+    format: 'Deze run klopt niet.',
+    copy: 'Deze run werd al ingestuurd.',
+    origin: 'Deze site mag geen scores insturen.'
   });
 });

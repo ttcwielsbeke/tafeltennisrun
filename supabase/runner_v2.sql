@@ -47,6 +47,9 @@ create table if not exists public.runs (
   crash        text not null,  -- nopper | table | net | machine
   frames       int  not null,  -- lengte van de run in 1/60 s
   kit          text not null,
+  -- SHA-256 (hex) van [frames, invoerlijst]: dezelfde invoer op dezelfde
+  -- seed mag maar één keer in de ranglijst (geen gekopieerde runs).
+  inputs_hash  text not null,
   created_at   timestamptz not null default now(),
 
   -- Extra laag: de Edge Function rekent al juist, dit vangt fouten op.
@@ -68,6 +71,13 @@ create table if not exists public.runs (
   )
 );
 
+-- Voor een database van vóór deze kolom: eerst toevoegen, dan de index.
+-- (Bestaan er al runs, dan blijft de kolom daar leeg; nieuwe runs vullen
+-- ze altijd in. Een lege waarde botst niet in de unieke index.)
+alter table public.runs add column if not exists inputs_hash text;
+create unique index if not exists runs_seed_inputs_hash_uniq
+  on public.runs (seed, inputs_hash);
+
 create index if not exists runs_seed_score_idx
   on public.runs (seed, score desc);
 create index if not exists runs_player_created_idx
@@ -76,6 +86,7 @@ create index if not exists runs_score_idx
   on public.runs (score desc);
 
 -- De beste invoerlijst per speler per dag (voor een spookloper, later).
+-- Niet publiek leesbaar: wie de invoer kan lezen, kan de run kopiëren.
 create table if not exists public.best_inputs (
   player_id    uuid not null references public.players (id) on delete cascade,
   seed         text not null,
@@ -136,21 +147,21 @@ drop policy if exists "runs lezen" on public.runs;
 create policy "runs lezen" on public.runs
   for select to anon, authenticated using (true);
 
+-- best_inputs is voorlopig privé (enkel de service-rol): de leesregel van
+-- vroeger gaat weg. Weer openzetten wanneer de spookloper gebouwd wordt.
 drop policy if exists "best_inputs lezen" on public.best_inputs;
-create policy "best_inputs lezen" on public.best_inputs
-  for select to anon, authenticated using (true);
 
--- Op player_secrets bewust geen enkele policy. En geen insert-, update- of
--- delete-policies op de andere tabellen: de service-rol omzeilt RLS toch.
+-- Op player_secrets en best_inputs bewust geen enkele policy. En geen insert-,
+-- update- of delete-policies op de andere tabellen: de service-rol omzeilt RLS toch.
 
 -- Supabase geeft nieuwe tabellen standaard alle rechten aan anon en
 -- authenticated. Eerst alles intrekken, dan enkel `select` teruggeven.
-revoke all on public.players, public.runs, public.best_inputs,
+revoke all on public.players, public.runs,
   public.daily_best, public.alltime_best
   from anon, authenticated;
-revoke all on public.player_secrets from anon, authenticated;
+revoke all on public.player_secrets, public.best_inputs from anon, authenticated;
 
-grant select on public.players, public.runs, public.best_inputs,
+grant select on public.players, public.runs,
   public.daily_best, public.alltime_best
   to anon, authenticated;
 
@@ -161,6 +172,7 @@ grant select on public.players, public.runs, public.best_inputs,
 do $$
 begin
   if to_regclass('public.runner_scores') is not null then
+    drop policy if exists "runner_scores toevoegen" on public.runner_scores;
     revoke insert, update, delete on public.runner_scores from anon, authenticated;
   end if;
 end

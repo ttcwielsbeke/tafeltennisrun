@@ -1,8 +1,9 @@
 /* ============================================================
    Tafeltennisrun — Edge Function `submit-run`
    Ontvangt de invoerlijst van een dagrun, rekent die opnieuw na
-   met dezelfde spelcode, claimt of controleert de naam, past de
-   tempolimiet toe en bewaart de run met de service-rol.
+   met dezelfde spelcode, claimt of controleert de naam, weigert
+   een kopie van een eerder ingestuurde run, past de tempolimiet
+   toe en bewaart de run met de service-rol.
    Alle controles op het verzoek zelf zitten in core.js (getest
    in Node); dit bestand doet enkel HTTP, CORS, hashen en database.
    ============================================================ */
@@ -101,24 +102,30 @@ function sameHash(a: string, b: string): boolean {
   return diff === 0;
 }
 
-async function findPlayer(nameKey: string): Promise<{ id: string } | null> {
-  const { data, error } = await db.from('players').select('id').eq('name_key', nameKey).maybeSingle();
-  if (error) throw error;
-  return data;
+// Zoekt eerst op name_key (lower() in Postgres). Valt dat mis, dan op de naam
+// zoals hij binnenkwam: bij letters als İ of een slot-sigma geeft toLowerCase()
+// in JS soms iets anders dan lower() in Postgres, en dan zou de eigenaar zijn
+// eigen naam nooit meer terugvinden.
+async function findPlayer(name: string): Promise<{ id: string } | null> {
+  const byKey = await db.from('players').select('id').eq('name_key', name.toLowerCase()).maybeSingle();
+  if (byKey.error) throw byKey.error;
+  if (byKey.data) return byKey.data;
+  const byName = await db.from('players').select('id').eq('name', name).maybeSingle();
+  if (byName.error) throw byName.error;
+  return byName.data;
 }
 
 // Geeft de speler terug, of null als de naam van een ander toestel is.
 async function claimName(name: string, hash: string): Promise<{ id: string; isNew: boolean } | null> {
-  const key = name.toLowerCase();
-  let player = await findPlayer(key);
+  let player = await findPlayer(name);
 
   if (!player) {
     const ins = await db.from('players').insert({ name }).select('id').single();
     if (ins.error) {
       if (ins.error.code !== '23505') throw ins.error;
       // Iemand anders claimde de naam net voor ons: de unieke index beslist.
-      player = await findPlayer(key);
-      if (!player) return null;  // bv. als lower() in Postgres anders uitvalt dan in JS
+      player = await findPlayer(name);
+      if (!player) return null;  // de naam bestaat in een andere schrijfwijze die we niet terugvinden
     } else {
       const sec = await db.from('player_secrets').insert({ player_id: ins.data.id, secret_hash: hash });
       if (sec.error) {
@@ -186,6 +193,15 @@ async function handle(req: Request, cors: Record<string, string>): Promise<Respo
   const player = await claimName(run.name, hash);
   if (!player) return failure(409, 'name', cors);
 
+  // 3b. Kopie: precies deze invoer op deze seed is al eens ingestuurd
+  // (door wie dan ook). Genormaliseerd: enkel [frame, actie], net als in best_inputs.
+  const inputs = run.inputs.map((e) => [e[0], e[1]]);
+  const inputsHash = await sha256Hex(JSON.stringify([run.frames, inputs]));
+  const seen = await db.from('runs').select('id')
+    .eq('seed', run.seed).eq('inputs_hash', inputsHash).limit(1).maybeSingle();
+  if (seen.error) throw seen.error;
+  if (seen.data) return failure(409, 'copy', cors);
+
   // 4. Tempo: niet te snel na de vorige run van deze speler
   if (!player.isNew && core.tooFast(await lastRunAt(player.id), now, run.frames)) {
     return failure(429, 'rate', cors);
@@ -212,9 +228,14 @@ async function handle(req: Request, cors: Record<string, string>): Promise<Respo
     blocks: result.blocks,
     crash: result.crash,
     frames: run.frames,
-    kit: run.kit
+    kit: run.kit,
+    inputs_hash: inputsHash
   });
-  if (ins.error) throw ins.error;
+  if (ins.error) {
+    // twee keer dezelfde run tegelijk: de unieke index (seed, inputs_hash) beslist
+    if (ins.error.code === '23505') return failure(409, 'copy', cors);
+    throw ins.error;
+  }
 
   // de invoerlijst enkel bewaren als het de beste van deze speler op deze seed is
   const stored = await db.from('best_inputs').select('score')
@@ -227,7 +248,7 @@ async function handle(req: Request, cors: Record<string, string>): Promise<Respo
       score,
       game_version: run.version,
       frames: run.frames,
-      inputs: run.inputs.map((e) => [e[0], e[1]]),  // genormaliseerde kopie: nooit extra velden bewaren
+      inputs,  // genormaliseerde kopie (zie 3b): nooit extra velden bewaren
       updated_at: new Date().toISOString()
     }, { onConflict: 'player_id,seed' });
     if (up.error) throw up.error;
@@ -251,9 +272,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
   try {
     // Een browser van een vreemde site krijgt niets; zonder Origin (curl) mag het wel.
     // CORS is geen beveiliging, de herberekening wel.
-    if (origin && !originAllowed(origin)) return failure(403, 'format', cors);
+    if (origin && !originAllowed(origin)) return failure(403, 'origin', cors);
     if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
-    if (req.method !== 'POST') return failure(405, 'format', cors);
+    if (req.method !== 'POST') return reply(405, { ok: false, code: 'method', message: MESSAGES.error }, cors);
     return await handle(req, cors);
   } catch (err) {
     // geen geheimen in de logs: enkel de foutmelding
