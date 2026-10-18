@@ -211,11 +211,16 @@ TTR_CONFIG = {
 - Telefoon: veeg links/rechts/omhoog/omlaag; een korte tik = springen.
 
 **`render.js`**
-- `TTR.createRenderer(canvas) → { resize(), draw(state), setSkin(id) }`; `TTR.KITS` = de tenues per id — tekent hal (parket, zijlijnen,
-  tafels in de verte, scorebord), speler met bat, noppenspelers, tafels, netten, ballen,
-  schild, magneet, time-out, ballenbak en de HUD (score, ballen, een balk per lopende power-up). Past zich aan de canvasgrootte aan.
+- `TTR.createRenderer(canvas) → { resize(), draw(state), setSkin(id) }`; `TTR.KITS` = de tenues per id — tekent hal (parket met
+  lampspiegelingen, zijlijnen, scorebord), aankleding langs de baan (reservetafels, trainersbank, ballenbak,
+  scheidsrechterstafel, supporters), speler met bat, noppenspelers, tafels, netten en ballenmachines (met een
+  geel-zwarte strook eronder: hier sliden), ballen, schild, magneet, time-out, ballenbak en de HUD (score, ballen,
+  een balk per lopende power-up). Past zich aan de canvasgrootte aan; in landschap hangt de camera hoger, zodat de
+  speler niet voor de obstakels in zijn baan staat.
   Bochten: vloer, lijnen en items schuiven opzij volgens `curveAt` (twee keer geïntegreerd vanaf
-  de speler), de achtergrond schuift mee met `headingAt`.
+  de speler), het muurpanorama (2,4 × de schermbreedte, naadloos) schuift mee met `headingAt`.
+  De speler loopt met een animatie die volgt uit de state; enkel landen en een bal pakken onthoudt de
+  renderer even (squash, forehand).
 
 **`board.js`**
 - `TTR.createBoard(cfg = TTR_CONFIG.board, storage = localStorage, fetchFn = fetch) → Board`
