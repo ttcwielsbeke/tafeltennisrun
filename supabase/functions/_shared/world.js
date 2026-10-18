@@ -166,8 +166,9 @@
       // afstand tot de volgende rij: eerst in meter zoals altijd, later in tijd bij de verwachte snelheid
       const r = rng.next();
       let gap = Math.max(MIN_ROW_GAP, lerp(30, 19, d) + r * lerp(14, 6, d));
-      // laat: 0,95..1,30 keer de doeltijd, die van 1,0 s naar 0,9 s zakt; de vloer is het minimum, niet de regel
-      if (late > 0) gap = v * lerp(1.0, 0.9, late) * (0.95 + 0.35 * r);
+      // laat: 0,95..1,30 keer een doeltijd die van 0,95 s naar 0,85 s zakt (~0,81..1,11 s op het einde,
+      // gemiddeld ~1,0 s); de vloer van 0,9 s is het minimum, niet de regel
+      if (late > 0) gap = v * lerp(0.95, 0.85, late) * (0.95 + 0.35 * r);
       // combinatie: springen en meteen sliden (of omgekeerd), op de kortste veilige afstand
       const full = lanes[0] === lanes[1] && lanes[1] === lanes[2] && (lanes[0] === 'table' || lanes[0] === 'net');
       if (late > 0 && full && !wasForced && rng.chance(0.15 + 0.6 * late)) {
