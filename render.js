@@ -45,7 +45,7 @@
   };
   /* tenues, zoals in ULTRA SMASH! */
   const CLUB = { shirt: '#161616', trim: '#f4f4f4', hem: '#0a0a0a', shorts: '#111111',
-                 stripes: ['#e4474c', '#c6a743', '#2eb1c2'] };
+                 stripes: ['#fe0000', '#b6ff00', '#0094fe'] };
   /* de chopper: verdediger in wit met blauw, lange (zwarte) noppen */
   const CHOP = { shirt: '#f2f4f7', trim: '#1a5ca8', shorts: '#1c2430', pips: ['#9aa3ad', '#3a3f47', '#111111'], bat: '#1b1d22' };
   const PIPS = { shirt: '#c8242a', trim: '#8d1519', hem: '#8d1519', shorts: '#1c2430',
@@ -63,7 +63,7 @@
     groen:    Object.assign({}, CLUB, { bat: '#2fa84f', batPips: ['#9cf0a8', '#2fa84f', '#14602a'],
                 backName: 'NOPPEN', socks: '#2fa84f', wristband: '#2fa84f' }),
     kampioen: { shirt: '#e0b520', trim: '#fff6c8', hem: '#a88410', shorts: '#111111',
-                stripes: ['#e4474c', '#161616', '#2eb1c2'], bat: C.red, backName: 'KAMPIOEN',
+                stripes: CLUB.stripes, bat: C.red, backName: 'KAMPIOEN',
                 shoes: C.gold, headband: '#fff6c8' }
   };
   const OUTLINE = '#0a1424';   // donkere rand rond figuren

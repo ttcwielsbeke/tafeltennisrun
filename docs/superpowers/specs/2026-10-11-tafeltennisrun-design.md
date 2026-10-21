@@ -84,7 +84,7 @@ Alles staat in het teken van **TTC Wielsbeke-Spotit**, in dezelfde stijl als het
 
 - **Speler** draagt altijd (lopen, springen, sliden, schild) het clubshirt uit smash (`CLUB`):
   shirt `#161616`, zoom `#0a0a0a`, short `#111111`, witte sokken en schoenen `#f4f4f4`, huid `#f0c39a`,
-  wit boordje `#f4f4f4`, een klein wit logootje, drie strepen `#e4474c` / `#c6a743` / `#2eb1c2`. Bat in clubrood `#c8242a`.
+  wit boordje `#f4f4f4`, een klein wit logootje, drie strepen `#fe0000` / `#b6ff00` / `#0094fe` (rood, limoengroen, blauw, zoals in het clublogo). Bat in clubrood `#c8242a`.
 - **Noppenspelers** dragen het PIPS OUT!-tenue (`PIPS` in smash): rood `#c8242a`, boord `#8d1519`,
   een noppenrubber-look met `#f0716a` / `#d94a44` / `#8b1a1f`. De aartsrivaal: herkenbaar houden.
 - **Palet**: blauw `#0b3a75` / `#062a56` / `#1a5ca8`, goud `#ffd23f`, chrome `#9ed4ff`, inkt `#02132b`.
