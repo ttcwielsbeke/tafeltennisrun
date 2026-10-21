@@ -90,6 +90,19 @@
         if (doc.fonts.addEventListener) doc.fonts.addEventListener('loadingdone', () => { fontKey++; });
       }
     } catch (e) { /* geen fonts-api */ }
+    // het clublogo en de hoofdsponsor aan de muur; tot ze binnen zijn tekenen we de oude vlag en tekst
+    const logos = {};
+    try {
+      const doc = canvas.ownerDocument;
+      const Img = doc && doc.defaultView && doc.defaultView.Image;
+      if (Img) {
+        for (const [k, src] of [['club', 'img/clublogo.png'], ['sponsor', 'img/spotit.png']]) {
+          const im = new Img();
+          im.onload = () => { logos[k] = im; fontKey++; };
+          im.src = src;
+        }
+      }
+    } catch (e) { /* geen afbeeldingen: dan de vlag en de tekst */ }
     let kit = KITS.club;    // tenue van de speler
     // "minder beweging" van het toestel: geen strepen, niet knipperen, rustigere effecten
     let calm = false;
@@ -236,15 +249,20 @@
       g.fillStyle = C.gold;
       g.fillText(':', sx0 + sw * 0.5, sy0 + sh * 0.62);
 
-      // clubbanner onder het scorebord
-      banner(g, W * 0.5, sy0 + sh + 3, plTop, W * 0.5, 'TTC WIELSBEKE-SPOTIT', C.ink, C.gold, C.white);
+      // hoofdsponsor onder het scorebord
+      if (logos.sponsor) logoBoard(g, logos.sponsor, W * 0.5, sy0 + sh + 3, plTop, W * 0.5);
+      else banner(g, W * 0.5, sy0 + sh + 3, plTop, W * 0.5, 'TTC WIELSBEKE-SPOTIT', C.ink, C.gold, C.white);
 
       // ventilator
       const fr = clamp(Math.min(hy * 0.13, wallH * 0.3), 8, 46);
       fan(g, W * 0.88, winY + winH + fr * 1.3, fr);
 
-      // clubvlag: zwart met de drie strepen
-      flag(g, W * 0.1, midY, clamp(Math.min(W * 0.12, wallH * 0.9), 26, 120));
+      // het clublogo op een wit bord; zonder logo de oude clubvlag
+      const lw = clamp(Math.min(W * 0.2, wallH * 1.1), 40, 200);
+      // links naast het scorebord en op zijn hoogte: nooit over het sponsorbord,
+      // en in landschap niet achter de score linksboven
+      if (logos.club) logoBoard(g, logos.club, sx0 - Math.max(8, W * 0.02) - lw / 2, winY + winH + wallH * 0.06, sy0 + sh, lw);
+      else flag(g, W * 0.1, midY, clamp(Math.min(W * 0.12, wallH * 0.9), 26, 120));
 
       // klok
       const kr = clamp(Math.min(hy * 0.1, wallH * 0.22), 7, 36);
@@ -307,6 +325,26 @@
       g.beginPath(); g.arc(fx, fy, fr, 0, Math.PI * 2); g.stroke();
       g.fillStyle = C.ink;
       g.beginPath(); g.arc(fx, fy, fr * 0.15, 0, Math.PI * 2); g.fill();
+    }
+
+    /* een logo op een wit bord met donkere rand, gecentreerd rond mx, hoogstens w breed,
+       verticaal in het midden van top..bottom; de verhouding van het logo blijft */
+    function logoBoard(g, im, mx, top, bottom, w) {
+      const ratio = im.naturalHeight / im.naturalWidth;
+      let iw = w * 0.84, ih = iw * ratio;
+      const maxH = (bottom - top) * 0.78;
+      if (ih > maxH) { ih = maxH; iw = ih / ratio; }
+      if (iw < 24) return;
+      const pad = Math.max(2, ih * 0.14);       // rand op maat van het logo, niet van de ruimte
+      const bw = iw + pad * 2.4, bh = ih + pad * 2;
+      const x = mx - bw / 2, y = top + (bottom - top - bh) / 2;
+      g.fillStyle = C.ink;
+      g.fillRect(x - 2, y - 2, bw + 4, bh + 4);
+      g.fillStyle = '#ffffff';
+      g.fillRect(x, y, bw, bh);
+      g.imageSmoothingEnabled = true;
+      g.imageSmoothingQuality = 'high';
+      g.drawImage(im, mx - iw / 2, y + (bh - ih) / 2, iw, ih);
     }
 
     function flag(g, bx, by, bw) {

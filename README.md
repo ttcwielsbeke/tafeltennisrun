@@ -214,6 +214,7 @@ Het lege bestand `.nojekyll` zorgt dat GitHub de bestanden ongewijzigd serveert.
 |---|---|
 | `index.html` | pagina, canvas, knoppen, naamvraag, ranglijstpaneel |
 | `style.css` | clubkleuren en het pixel-lettertype |
+| `img/clublogo.png`, `img/spotit.png` | het clublogo en de hoofdsponsor (startscherm en de muur van de hal) |
 | `config.js` | Supabase-sleutels, snelheden, sprong, power-ups |
 | `rng.js` | seedbare random generator en de dagseed |
 | `world.js` | de baan uit de seed: obstakels, ballen, power-ups, bochten |
