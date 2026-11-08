@@ -24,7 +24,7 @@
     },
 
     game: {
-      version: 4,            // spelversie: verhogen bij elke wijziging aan spellogica of baan
+      version: 5,            // spelversie: verhogen bij elke wijziging aan spellogica of baan
 
       /* snelheid in meter per seconde */
       startSpeed: 10,

@@ -60,22 +60,25 @@
   function lateness(z) { return clamp01((expectedTime(z) - 120) / 180); }
   // 'verlengingen' = 0 tot 6 minuten, dan oplopend tot 1 na 9 minuten: het blijft moeilijker worden
   function overtime(z) { return clamp01((expectedTime(z) - 360) / 180); }
+  // 'eindspurt' = 0 tot 8 minuten, dan oplopend tot 1 na 10 minuten: geen schilden meer en meer obstakels per rij
+  const ENDGAME_FROM = 480;
+  function endgame(z) { return clamp01((expectedTime(z) - ENDGAME_FROM) / 120); }
   // minimale afstand tussen rijen bij snelheid v (+0,15 m: afronding van z op 0,1 m)
   function minGap(v) { return Math.max(MIN_ROW_GAP, v * MIN_ROW_TIME + 0.15); }
   const round1 = (v) => Math.round(v * 10) / 10;
 
   // Rij-patronen: [type baan 0, baan 1, baan 2], null = vrij.
   // 'min' = vanaf welke moeilijkheid (0..1) het patroon mag komen.
-  function rowPattern(rng, d, late, ot) {
+  function rowPattern(rng, d, late, ot, eg) {
     const L = rng.int(3);
     const others = [0, 1, 2].filter((l) => l !== L);
     const lanes = [null, null, null];
     const options = [
-      { w: 4, min: 0, make() { lanes[L] = 'nopper'; } },
+      { w: 4, min: 0, single: true, make() { lanes[L] = 'nopper'; } },
       { w: 3, min: 0, make() { lanes[0] = lanes[1] = lanes[2] = 'table'; } },
       { w: 3, min: 0, make() { lanes[0] = lanes[1] = lanes[2] = 'net'; } },
-      { w: 2, min: 0, make() { lanes[L] = 'machine'; } },
-      { w: 4, min: 0.1, make() { lanes[others[0]] = lanes[others[1]] = 'nopper'; } },
+      { w: 2, min: 0, single: true, make() { lanes[L] = 'machine'; } },
+      { w: 4, min: 0.1, twoNop: true, make() { lanes[others[0]] = lanes[others[1]] = 'nopper'; } },
       { w: 3, min: 0.2, make() { lanes[L] = 'nopper'; for (const o of others) lanes[o] = 'table'; } },
       { w: 3, min: 0.3, make() { lanes[L] = 'nopper'; for (const o of others) lanes[o] = 'net'; } },
       // chopper: een verdediger die opschuift naar een buurbaan (pas na 2 minuten). De baan waar hij
@@ -96,11 +99,21 @@
     // later: minder losse noppenspelers, meer gemengde rijen
     // (twee noppenspelers en gemengde rijen dwingen een keuze af; volle rijen worden later altijd een combinatie)
     if (late > 0) for (const o of options) o.w *= o.min >= 0.1 ? 1 + 4 * late : o.w === 4 ? 1 - 0.6 * late : 1 - 0.3 * late;
+    // eindspurt: nog minder rijen met één obstakel, nog meer rijen met twee of drie,
+    // vooral twee noppenspelers (de vrije baan krijgt dan vaak nog een tafel of net, zie onder)
+    if (eg > 0) for (const o of options) o.w *= o.single ? 1 - 0.7 * eg : o.twoNop ? 1 + 3 * eg : o.min >= 0.1 ? 1 + 1.5 * eg : 1;
     let total = 0;
     for (const o of options) total += o.w;
     let r = rng.next() * total;
     for (const o of options) { r -= o.w; if (r < 0) { o.make(); break; } }
     if (lanes.every((t) => t === null)) lanes[L] = 'nopper';
+    // eindspurt: staat er in de enige veilige baan niets, dan steeds vaker een tafel of net.
+    // Opzij én springen of sliden: van baan wisselen kan ook in de lucht. Niet bij een chopper,
+    // die vertrekt uit die vrije baan.
+    if (eg > 0 && lanes.chopperFrom === undefined) {
+      const safe = [0, 1, 2].filter((l) => lanes[l] !== 'nopper');
+      if (safe.length === 1 && lanes[safe[0]] === null && rng.chance(0.7 * eg)) lanes[safe[0]] = rng.pick(['table', 'net']);
+    }
     return lanes;
   }
 
@@ -277,8 +290,8 @@
     while (z <= lastZ) {
       const rowZ = round1(z);
       const row = index + ':' + rowZ;
-      const v = expectedSpeed(rowZ), late = lateness(rowZ), ot = overtime(rowZ);
-      const lanes = forced ? [forced, forced, forced] : rowPattern(rng, d, late, ot);
+      const v = expectedSpeed(rowZ), late = lateness(rowZ), ot = overtime(rowZ), eg = endgame(rowZ);
+      const lanes = forced ? [forced, forced, forced] : rowPattern(rng, d, late, ot, eg);
       const wasForced = !!forced;
       forced = null;
       // laat in de run is een volle rij tafels of netten nooit gratis: meteen de omgekeerde erachter
@@ -302,8 +315,8 @@
       let gap = Math.max(MIN_ROW_GAP, lerp(30, 19, d) + r * lerp(14, 6, d));
       // laat: 1,0..1,3 keer een doeltijd die van 0,93 s naar 0,83 s zakt (~0,83..1,08 s op het einde,
       // gemiddeld ~0,95 s); de vloer van 0,9 s is het minimum, niet de regel. In de verlengingen
-      // (6 tot 9 minuten) zakt de doeltijd nog 5%.
-      if (late > 0) gap = v * lerp(0.93, 0.83, late) * lerp(1, 0.95, ot) * (1.0 + 0.3 * r);
+      // (6 tot 9 minuten) zakt de doeltijd nog 5%, in de eindspurt (8 tot 10 minuten) nog eens 3%.
+      if (late > 0) gap = v * lerp(0.93, 0.83, late) * lerp(1, 0.95, ot) * lerp(1, 0.97, eg) * (1.0 + 0.3 * r);
       // combinatie: springen en meteen sliden (of omgekeerd), op de kortste veilige afstand
       if (comboNext) {
         forced = comboNext;
@@ -333,7 +346,7 @@
 
       // af en toe een power-up, midden tussen twee rijen, in een andere baan dan de ballen
       // power-ups worden schaarser: 1 op 8 rijen bij de start, 1 op 16 na 6 minuten.
-      // Schilden het meest: een fout moet iets kosten.
+      // Schilden het meest: een fout moet iets kosten. Na 8 minuten geen schilden meer: die plek blijft leeg.
       const p = rng.next();
       const tRow = expectedTime(rowZ), scarce = clamp01(tRow / 360);
       const chance = lerp(0.125, 0.0625, scarce);
@@ -341,7 +354,7 @@
         const lane = (ballLane + 1 + rng.int(2)) % 3;
         const u = p / chance, sh = lerp(0.25, 0.12, scarce), rest = (1 - sh) / 3;
         const type = u < sh ? 'shield' : u < sh + rest ? 'magnet' : u < sh + 2 * rest ? 'timeout' : 'bak';
-        add({ type, lane, z: round1(rowZ + itemGap / 2), len: LEN[type] });
+        if (type !== 'shield' || tRow < ENDGAME_FROM) add({ type, lane, z: round1(rowZ + itemGap / 2), len: LEN[type] });
       }
 
       z += gap;

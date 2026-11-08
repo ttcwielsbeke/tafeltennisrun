@@ -383,3 +383,40 @@ test('vanaf de 7e baas: minstens twee choppers en een combinatie', () => {
     }
   }
 });
+
+/* ---------- versie 5: de eindspurt na 8 minuten ---------- */
+
+test('na 8 minuten geen schilden meer, de andere power-ups blijven', () => {
+  const pu = new Set(['magnet', 'timeout', 'bak']);
+  let before = 0, others = 0;
+  for (const seed of SEEDS) {
+    assert.equal(perMinute(seed, 480, 900, (it) => it.type === 'shield'), 0, seed + ': schild na 8 minuten');
+    before += perMinute(seed, 360, 470, (it) => it.type === 'shield');
+    others += perMinute(seed, 480, 900, (it) => pu.has(it.type));
+  }
+  assert.ok(before > 0, 'tussen 6 en 8 minuten nog wel schilden');
+  assert.ok(others / SEEDS.length > 1.5, 'te weinig andere power-ups na 8 minuten: ' + (others / SEEDS.length).toFixed(1));
+});
+
+// opzij én springen of sliden: twee noppenspelers en een tafel of net in de enige vrije baan
+const dodgeJump = (r) => r.lanes.filter((t) => t === 'nopper').length === 2 && r.lanes.some((t) => t === 'table' || t === 'net');
+function rowsBetween(seed, t0, t1) {
+  const z0 = zAt(t0), z1 = zAt(t1), rows = [];
+  for (let i = Math.floor(z0 / W.CHUNK_LEN); i <= Math.ceil(z1 / W.CHUNK_LEN); i++) rows.push(...W.rowsOf(W.generateChunk(seed, i)));
+  return rows.filter((r) => r.z >= z0 && r.z < z1);
+}
+
+test('eindspurt: na 10 minuten meer obstakels per minuut en veel vaker opzij-en-springen dan tussen 6 en 8', () => {
+  const OBST = new Set(['nopper', 'chopper', 'table', 'net', 'machine']);
+  let mid = 0, end = 0, djMid = 0, djEnd = 0;
+  for (const seed of SEEDS) {
+    mid += perMinute(seed, 360, 480, (it) => OBST.has(it.type));
+    end += perMinute(seed, 600, 840, (it) => OBST.has(it.type));
+    djMid += rowsBetween(seed, 360, 480).filter(dodgeJump).length / 2;   // per minuut
+    const late = rowsBetween(seed, 600, 840);
+    for (const r of late) assert.ok(W.isRowSafe(r), seed + ' rij ' + r.row + ' ' + r.lanes);
+    djEnd += late.filter(dodgeJump).length / 4;
+  }
+  assert.ok(end > mid * 1.05, 'niet meer obstakels: ' + (mid / SEEDS.length).toFixed(0) + ' → ' + (end / SEEDS.length).toFixed(0) + '/min');
+  assert.ok(djEnd > djMid * 2, 'niet vaker opzij-en-springen: ' + (djMid / SEEDS.length).toFixed(1) + ' → ' + (djEnd / SEEDS.length).toFixed(1) + '/min');
+});

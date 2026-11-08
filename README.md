@@ -36,9 +36,11 @@ Open `index.html` of speel online (GitHub Pages, zie onder).
   trager tot 30 m/s (~6 min), en in de **verlengingen** nog tot 34 m/s (~9 min). Vanaf 2 minuten worden de rijen
   gemengder en komen ze vlugger na elkaar; een volle rij tafels of netten komt dan altijd als combinatie (springen en
   meteen sliden, of omgekeerd). Na 6 minuten komen er nog meer choppers met een noppenspeler ernaast.
+  In de **eindspurt** (vanaf 8 minuten, op volle kracht na 10) staan er meer obstakels per rij: vaker twee
+  noppenspelers, en in de enige vrije baan dan steeds vaker een tafel of net (opzij én springen of sliden).
   Tussen twee rijen zit altijd minstens 0,9 s. Na een botsing: één tik op **Opnieuw**.
 - **Power-ups worden schaarser** naarmate je verder loopt: van 1 op 8 rijen bij de start tot 1 op 16 na 6 minuten.
-  Vooral schilden: laat in de run is een fout echt een fout.
+  Vooral schilden: laat in de run is een fout echt een fout. Na 8 minuten komen er helemaal geen schilden meer.
 - **Oefenen** gebruikt een willekeurige baan en telt niet mee voor de ranglijst.
 - Geluid staat standaard uit (knop rechtsboven); je keuze wordt onthouden. Alles is gesynthetiseerd: sneakerpiep
   bij een slide, een echte "pok" per bal (na elkaar gepakt klimt de toon), het fluitje van de scheidsrechter bij
