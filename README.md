@@ -211,13 +211,29 @@ De officiële repo staat bij de club: <https://github.com/ttcwielsbeke/tafeltenn
 Een minuutje later staat het spel op **<https://ttcwielsbeke.github.io/tafeltennisrun/>**.
 Het lege bestand `.nojekyll` zorgt dat GitHub de bestanden ongewijzigd serveert.
 
+### De link-preview
+
+Wie de link deelt op Facebook of WhatsApp, krijgt een kaart te zien: `og.jpg`, met de og-tags in
+`index.html`. De kaart is niet nagetekend: `tools/og.html` laat het echte spel lopen met de autopiloot
+op de vaste baan `clubkaart`, zoekt een mooi moment (midden in een sprong, veel obstakels voor je) en
+tekent dat met de echte renderer. Opnieuw maken, bijvoorbeeld als de hal er anders uitziet:
+
+1. `python tools/ogsave.py` (luistert op poort 8124 en schrijft enkel `og.jpg`);
+2. een lokale server in de repo, bijvoorbeeld `python -m http.server 8123`;
+3. open <http://localhost:8123/tools/og.html>: na een paar seconden staat er `KLAAR` en is `og.jpg` vervangen.
+
+Facebook bewaart een kaart een tijd: met de [Sharing Debugger](https://developers.facebook.com/tools/debug/)
+haal je de nieuwe op.
+
 ## Bestanden
 
 | bestand | inhoud |
 |---|---|
-| `index.html` | pagina, canvas, knoppen, naamvraag, ranglijstpaneel |
+| `index.html` | pagina, canvas, knoppen, naamvraag, ranglijstpaneel, og-tags voor de link-preview |
 | `style.css` | clubkleuren en het pixel-lettertype |
 | `img/clublogo.png`, `img/spotit.png` | het clublogo en de hoofdsponsor (startscherm en de muur van de hal) |
+| `og.jpg` | 1200×630 kaart voor de link-preview op Facebook, WhatsApp en co. |
+| `tools/og.html`, `tools/ogsave.py` | generator die `og.jpg` opnieuw maakt uit het echte spel (zie onder) |
 | `config.js` | Supabase-sleutels, snelheden, sprong, power-ups |
 | `rng.js` | seedbare random generator en de dagseed |
 | `world.js` | de baan uit de seed: obstakels, ballen, power-ups, bochten |
