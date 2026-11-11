@@ -151,7 +151,7 @@ tempolimiet toe en bewaart de run. Eenmalig installeren:
 
    ```sh
    supabase functions deploy submit-run --no-verify-jwt
-   supabase secrets set ALLOWED_ORIGIN=https://boermansjo.github.io
+   supabase secrets set ALLOWED_ORIGIN=https://ttcwielsbeke.github.io,https://boermansjo.github.io
    ```
 
    `ALLOWED_ORIGIN` mag een komma-gescheiden lijst zijn. `http://localhost:<poort>` en
@@ -203,11 +203,12 @@ bot schrijft die de baan echt speelt: zulke runs haal je hier met de hand weg.
 
 ## Hosten op GitHub Pages
 
-Repo: <https://github.com/boermansjo/tafeltennisrun>. Eenmalig aanzetten:
+De officiële repo staat bij de club: <https://github.com/ttcwielsbeke/tafeltennisrun> (remote `club`;
+`origin` is de persoonlijke kopie <https://github.com/boermansjo/tafeltennisrun>). Eenmalig aanzetten:
 **Settings → Pages → Source: Deploy from a branch → `main` / `/ (root)`**
-(<https://github.com/boermansjo/tafeltennisrun/settings/pages>).
+(<https://github.com/ttcwielsbeke/tafeltennisrun/settings/pages>).
 
-Een minuutje later staat het spel op **<https://boermansjo.github.io/tafeltennisrun/>**.
+Een minuutje later staat het spel op **<https://ttcwielsbeke.github.io/tafeltennisrun/>**.
 Het lege bestand `.nojekyll` zorgt dat GitHub de bestanden ongewijzigd serveert.
 
 ## Bestanden
